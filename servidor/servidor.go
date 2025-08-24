@@ -1,0 +1,192 @@
+package main
+
+import (
+	"bufio"
+	"fmt"
+	"io"
+	"net"
+	"strconv"
+	"strings"
+	"sync"
+	"time"
+)
+
+type Cliente struct {
+	conexao net.Conn
+	nome    string
+	jogoID  string
+	estado  string
+}
+
+type Partida struct {
+	ID        string
+	jogadores map[string]*Cliente
+}
+
+var clientes = make(map[string]*Cliente)
+var partidas = make(map[string]*Partida)
+var filaEspera []*Cliente
+var clientesMutex = &sync.Mutex{}
+var partidasMutex = &sync.Mutex{}
+var esperaMutex = &sync.Mutex{}
+
+func main() {
+	fmt.Println("Servidor iniciado, aguardando conexões na porta 8080...")
+	ouvinte, err := net.Listen("tcp", ":8080")
+	if err != nil {
+		fmt.Println("\033[31mErro ao iniciar o servidor:", err, "\033[0m")
+		return
+	}
+	defer ouvinte.Close()
+
+	for {
+
+		conexao, err := ouvinte.Accept()
+		if err != nil {
+			fmt.Println("\033[31mErro ao aceitar conexão:", err, "\033[0m")
+			continue
+		}
+		go lidarComConexao(conexao)
+	}
+}
+
+func lidarComConexao(conexao net.Conn) {
+	fmt.Println("\033[32mNovo cliente conectado:", conexao.RemoteAddr().String(), "\033[0m")
+	conexao.Write([]byte("Bem vindo! Digite seu nome:\n"))
+	leitor := bufio.NewReader(conexao)
+	nome, _ := leitor.ReadString('\n')
+	nome = strings.TrimSpace(nome)
+
+	cliente := &Cliente{conexao: conexao, nome: nome, estado: ""}
+
+	clientesMutex.Lock()
+	clientes[nome] = cliente
+	clientesMutex.Unlock()
+
+	cliente.conexao.Write([]byte("Digite 'Procurar' para entrar em uma partida\n"))
+
+	defer desconectarCliente(cliente)
+
+	for {
+		mensagem, err := leitor.ReadString('\n')
+		if err == io.EOF {
+			fmt.Println("Cliente desconectado:", conexao.RemoteAddr().String())
+			//desconectarCliente(cliente)
+			break
+		}
+		if err != nil {
+			fmt.Println("\033[31mErro ao ler dados do cliente:", err, "\033[0m")
+			//desconectarCliente(cliente)
+			break
+		}
+		mensagem = strings.TrimSpace(mensagem)
+
+		if cliente.jogoID != "" {
+			encaminharMensagem(cliente, mensagem)
+		} else if strings.ToLower(mensagem) == "procurar" && cliente.estado == "" {
+			addFilaEspera(cliente)
+		} else {
+			switch cliente.estado {
+			case "":
+				conexao.Write([]byte("Digite 'Procurar' para começar a buscar uma partida:\n"))
+			case "esperando":
+				conexao.Write([]byte("Estamos buscando um adversário! espere"))
+			}
+		}
+
+	}
+}
+
+func addFilaEspera(cliente *Cliente) {
+	cliente.estado = "esperando"
+	esperaMutex.Lock()
+	filaEspera = append(filaEspera, cliente)
+	esperaMutex.Unlock()
+	cliente.conexao.Write([]byte("Buscando adiversário, espere enquanto buscamos um adiversário!\n"))
+	fmt.Printf("Jogador %s entrou na fila de espera\n", cliente.nome)
+	verificarEspera()
+}
+
+func verificarEspera() {
+	esperaMutex.Lock()
+	defer esperaMutex.Unlock()
+
+	if len(filaEspera) >= 2 {
+		jogador1 := filaEspera[0]
+		jogador2 := filaEspera[1]
+
+		filaEspera = filaEspera[2:]
+		fmt.Printf("INICIANDO PARTIDA: %s x %s\n", jogador1.nome, jogador2.nome)
+		jogoID := "jogo:" + strconv.FormatInt(time.Now().UnixNano(), 10)
+
+		partidasMutex.Lock()
+		partida := &Partida{ID: jogoID, jogadores: make(map[string]*Cliente)}
+		partidas[jogoID] = partida
+		partida.jogadores[jogador1.nome] = jogador1
+		partida.jogadores[jogador2.nome] = jogador2
+		partida.jogadores[jogador1.nome].estado = "jogando"
+		partida.jogadores[jogador2.nome].estado = "jogando"
+		jogador1.jogoID = jogoID
+		jogador2.jogoID = jogoID
+		partidasMutex.Unlock()
+
+		mensagem := fmt.Sprintf("\nAdversário encontrado: %s\n", jogador2.nome)
+		jogador1.conexao.Write([]byte(mensagem))
+		mensagem = fmt.Sprintf("\nAdversário encontrado: %s\n", jogador1.nome)
+		jogador2.conexao.Write([]byte(mensagem))
+	}
+}
+
+func desconectarCliente(cliente *Cliente) {
+	esperaMutex.Lock()
+	novaFila := []*Cliente{}
+	for _, c := range filaEspera {
+		if c.nome != cliente.nome {
+			novaFila = append(novaFila, c)
+		}
+	}
+	filaEspera = novaFila
+	esperaMutex.Unlock()
+
+	if cliente.jogoID != "" {
+		partidasMutex.Lock()
+		partida, ok := partidas[cliente.jogoID]
+		if ok {
+			for _, jogador := range partida.jogadores {
+				if jogador.nome != cliente.nome {
+					mensagem := fmt.Sprintf("\t------! %s saiu do jogo, a partida acabou------ pressione 'Enter' para voltar ao menu\n", cliente.nome)
+					jogador.conexao.Write(([]byte(mensagem)))
+					jogador.jogoID = ""
+					jogador.estado = ""
+				}
+			}
+			delete(partidas, cliente.jogoID)
+			cliente.jogoID = ""
+			cliente.estado = ""
+		}
+		partidasMutex.Unlock()
+
+	}
+
+	clientesMutex.Lock()
+	delete(clientes, cliente.nome)
+	clientesMutex.Unlock()
+
+	cliente.conexao.Close()
+	fmt.Printf("Cliente desconectado: %s\n", cliente.nome)
+
+}
+
+func encaminharMensagem(cliente *Cliente, mensagem string) {
+	partidasMutex.Lock()
+	sala, ok := partidas[cliente.jogoID]
+	partidasMutex.Unlock()
+
+	if ok {
+		for _, destinatario := range sala.jogadores {
+			if destinatario.nome != cliente.nome {
+				destinatario.conexao.Write([]byte(fmt.Sprintf("[%s]: %s\n", cliente.nome, mensagem)))
+			}
+		}
+	}
+}
