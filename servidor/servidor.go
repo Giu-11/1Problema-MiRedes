@@ -54,7 +54,7 @@ func main() {
 
 func lidarComConexao(conexao net.Conn) {
 	fmt.Println("\033[32mNovo cliente conectado:", conexao.RemoteAddr().String(), "\033[0m")
-	conexao.Write([]byte("Bem vindo! Digite seu nome:\n"))
+	conexao.Write([]byte("Bem vindo! Digite seu nome:\n-"))
 	leitor := bufio.NewReader(conexao)
 	nome, _ := leitor.ReadString('\n')
 	nome = strings.TrimSpace(nome)
@@ -65,7 +65,7 @@ func lidarComConexao(conexao net.Conn) {
 	clientes[nome] = cliente
 	clientesMutex.Unlock()
 
-	cliente.conexao.Write([]byte("Digite 'Procurar' para entrar em uma partida\n"))
+	cliente.conexao.Write([]byte("Digite 'Procurar' para entrar em uma partida\n-"))
 
 	defer desconectarCliente(cliente)
 
@@ -90,9 +90,9 @@ func lidarComConexao(conexao net.Conn) {
 		} else {
 			switch cliente.estado {
 			case "":
-				conexao.Write([]byte("Digite 'Procurar' para começar a buscar uma partida:\n"))
+				conexao.Write([]byte("Digite 'Procurar' para começar a buscar uma partida:\n-"))
 			case "esperando":
-				conexao.Write([]byte("Estamos buscando um adversário! espere"))
+				conexao.Write([]byte("Estamos buscando um adversário! espere\n-"))
 			}
 		}
 
@@ -104,7 +104,7 @@ func addFilaEspera(cliente *Cliente) {
 	esperaMutex.Lock()
 	filaEspera = append(filaEspera, cliente)
 	esperaMutex.Unlock()
-	cliente.conexao.Write([]byte("Buscando adiversário, espere enquanto buscamos um adiversário!\n"))
+	cliente.conexao.Write([]byte("Buscando adiversário, espere enquanto buscamos um adiversário!\n-"))
 	fmt.Printf("Jogador %s entrou na fila de espera\n", cliente.nome)
 	verificarEspera()
 }
@@ -139,17 +139,17 @@ func verificarEspera() {
 		jogador2.jogoID = jogoID
 		partidasMutex.Unlock()
 
-		mensagem := fmt.Sprintf("\nAdversário encontrado: %s\n", jogador2.nome)
+		mensagem := fmt.Sprintf("\nAdversário encontrado: %s\n-", jogador2.nome)
 		jogador1.conexao.Write([]byte(mensagem))
-		mensagem = fmt.Sprintf("\nAdversário encontrado: %s\n", jogador1.nome)
+		mensagem = fmt.Sprintf("\nAdversário encontrado: %s\n-", jogador1.nome)
 		jogador2.conexao.Write([]byte(mensagem))
 		switch primeiroJogador{
 		case 0:
-			jogador1.conexao.Write([]byte("Você é o primeiro a jogar!"))
-			jogador2.conexao.Write([]byte("Você é o segundo a jogar!"))
+			jogador1.conexao.Write([]byte("Você é o primeiro a jogar!\n-"))
+			jogador2.conexao.Write([]byte("Você é o segundo a jogar!\n-"))
 		case 1:
-			jogador2.conexao.Write([]byte("Você é o primeiro a jogar!"))
-			jogador1.conexao.Write([]byte("Você é o segundo a jogar!"))
+			jogador2.conexao.Write([]byte("\tVocê é o primeiro a jogar!\n-"))
+			jogador1.conexao.Write([]byte("\tVocê é o segundo a jogar!\n-"))
 		}
 	}
 }
@@ -171,7 +171,7 @@ func desconectarCliente(cliente *Cliente) {
 		if ok {
 			for _, jogador := range partida.jogadores {
 				if jogador.nome != cliente.nome {
-					mensagem := fmt.Sprintf("\t------! %s saiu do jogo, a partida acabou------ pressione 'Enter' para voltar ao menu\n", cliente.nome)
+					mensagem := fmt.Sprintf("\t------! %s saiu do jogo, a partida acabou------ pressione 'Enter' para voltar ao menu\n-", cliente.nome)
 					jogador.conexao.Write(([]byte(mensagem)))
 					jogador.jogoID = ""
 					jogador.estado = ""
@@ -203,15 +203,16 @@ func encaminharMensagem(remetente *Cliente, mensagem string) {
 		if partida.turno == remetente.nome{
 			for _, destinatario := range partida.jogadores {
 				if destinatario.nome != remetente.nome {
-					destinatario.conexao.Write([]byte(fmt.Sprintf("[%s]: %s\n", remetente.nome, mensagem)))
+					mensagem := fmt.Sprintf("[%s]: %s\n-", remetente.nome, mensagem)
+					destinatario.conexao.Write([]byte(mensagem))
 					partida.turno = destinatario.nome
-					destinatario.conexao.Write([]byte(">>> É o seu turno!\n"))
-					remetente.conexao.Write([]byte(">>> Turno do seu oponente.\n"))
+					destinatario.conexao.Write([]byte(">>> É o seu turno!\n-"))
+					remetente.conexao.Write([]byte(">>> Turno do seu oponente\n-"))
 				}
 			}
 
 		}else{
-			remetente.conexao.Write([]byte("Não é seu turno! espere o adverário jogar\n"))
+			remetente.conexao.Write([]byte("Não é seu turno! espere o adverário jogar\n-"))
 		}
 	}
 }

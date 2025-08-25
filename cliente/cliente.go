@@ -33,7 +33,7 @@ func receberMensagens(conexao net.Conn) {
 	defer conexao.Close()
 	leitor := bufio.NewReader(conexao)
 	for {
-		mensagem, err := leitor.ReadString('\n')
+		mensagem, err := leitor.ReadString('-')
 		if err != nil {
 			fmt.Println("Conexão perdida com o servidor.")
 			os.Exit(0)
