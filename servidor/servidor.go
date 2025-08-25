@@ -4,6 +4,7 @@ import (
 	"bufio"
 	"fmt"
 	"io"
+	"math/rand"
 	"net"
 	"strconv"
 	"strings"
@@ -21,6 +22,7 @@ type Cliente struct {
 type Partida struct {
 	ID        string
 	jogadores map[string]*Cliente
+	turno string
 }
 
 var clientes = make(map[string]*Cliente)
@@ -121,6 +123,13 @@ func verificarEspera() {
 
 		partidasMutex.Lock()
 		partida := &Partida{ID: jogoID, jogadores: make(map[string]*Cliente)}
+		primeiroJogador := rand.Intn(2)
+		switch primeiroJogador{
+		case 0:
+			partida.turno=jogador1.nome
+		case 1:
+			partida.turno=jogador2.nome
+		}
 		partidas[jogoID] = partida
 		partida.jogadores[jogador1.nome] = jogador1
 		partida.jogadores[jogador2.nome] = jogador2
@@ -134,6 +143,14 @@ func verificarEspera() {
 		jogador1.conexao.Write([]byte(mensagem))
 		mensagem = fmt.Sprintf("\nAdversário encontrado: %s\n", jogador1.nome)
 		jogador2.conexao.Write([]byte(mensagem))
+		switch primeiroJogador{
+		case 0:
+			jogador1.conexao.Write([]byte("Você é o primeiro a jogar!"))
+			jogador2.conexao.Write([]byte("Você é o segundo a jogar!"))
+		case 1:
+			jogador2.conexao.Write([]byte("Você é o primeiro a jogar!"))
+			jogador1.conexao.Write([]byte("Você é o segundo a jogar!"))
+		}
 	}
 }
 
@@ -177,16 +194,24 @@ func desconectarCliente(cliente *Cliente) {
 
 }
 
-func encaminharMensagem(cliente *Cliente, mensagem string) {
+func encaminharMensagem(remetente *Cliente, mensagem string) {
 	partidasMutex.Lock()
-	sala, ok := partidas[cliente.jogoID]
+	partida, ok := partidas[remetente.jogoID]
 	partidasMutex.Unlock()
 
 	if ok {
-		for _, destinatario := range sala.jogadores {
-			if destinatario.nome != cliente.nome {
-				destinatario.conexao.Write([]byte(fmt.Sprintf("[%s]: %s\n", cliente.nome, mensagem)))
+		if partida.turno == remetente.nome{
+			for _, destinatario := range partida.jogadores {
+				if destinatario.nome != remetente.nome {
+					destinatario.conexao.Write([]byte(fmt.Sprintf("[%s]: %s\n", remetente.nome, mensagem)))
+					partida.turno = destinatario.nome
+					destinatario.conexao.Write([]byte(">>> É o seu turno!\n"))
+					remetente.conexao.Write([]byte(">>> Turno do seu oponente.\n"))
+				}
 			}
+
+		}else{
+			remetente.conexao.Write([]byte("Não é seu turno! espere o adverário jogar\n"))
 		}
 	}
 }
