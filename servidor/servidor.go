@@ -19,9 +19,16 @@ type Cliente struct {
 	estado  string
 }
 
+type Jogador struct{
+	cliente *Cliente
+	mao []string
+	pontos int
+	//skins map[string]*string //TODO: implemantar as esteticas de cartas
+}
+
 type Partida struct {
 	ID        string
-	jogadores map[string]*Cliente
+	jogadores map[string]*Jogador
 	turno string
 }
 
@@ -114,42 +121,46 @@ func verificarEspera() {
 	defer esperaMutex.Unlock()
 
 	if len(filaEspera) >= 2 {
-		jogador1 := filaEspera[0]
-		jogador2 := filaEspera[1]
+		Cliente1 := filaEspera[0]
+		Cliente2 := filaEspera[1]
+
+		jogador1 := &Jogador{cliente: Cliente1, mao: make([]string, 0), pontos: 0}
+		jogador2 := &Jogador{cliente: Cliente2, mao: make([]string, 0), pontos: 0}
+
 
 		filaEspera = filaEspera[2:]
-		fmt.Printf("INICIANDO PARTIDA: %s x %s\n", jogador1.nome, jogador2.nome)
+		fmt.Printf("INICIANDO PARTIDA: %s x %s\n", Cliente1.nome, Cliente2.nome)
 		jogoID := "jogo:" + strconv.FormatInt(time.Now().UnixNano(), 10)
 
 		partidasMutex.Lock()
-		partida := &Partida{ID: jogoID, jogadores: make(map[string]*Cliente)}
+		partida := &Partida{ID: jogoID, jogadores: make(map[string]*Jogador)}
 		primeiroJogador := rand.Intn(2)
 		switch primeiroJogador{
 		case 0:
-			partida.turno=jogador1.nome
+			partida.turno=Cliente1.nome
 		case 1:
-			partida.turno=jogador2.nome
+			partida.turno=Cliente2.nome
 		}
 		partidas[jogoID] = partida
-		partida.jogadores[jogador1.nome] = jogador1
-		partida.jogadores[jogador2.nome] = jogador2
-		partida.jogadores[jogador1.nome].estado = "jogando"
-		partida.jogadores[jogador2.nome].estado = "jogando"
-		jogador1.jogoID = jogoID
-		jogador2.jogoID = jogoID
+		partida.jogadores[Cliente1.nome] = jogador1
+		partida.jogadores[Cliente2.nome] = jogador2
+		Cliente1.estado = "jogando"
+		Cliente2.estado = "jogando"
+		Cliente1.jogoID = jogoID
+		Cliente2.jogoID = jogoID
 		partidasMutex.Unlock()
 
-		mensagem := fmt.Sprintf("\nAdversário encontrado: %s\n-", jogador2.nome)
-		jogador1.conexao.Write([]byte(mensagem))
-		mensagem = fmt.Sprintf("\nAdversário encontrado: %s\n-", jogador1.nome)
-		jogador2.conexao.Write([]byte(mensagem))
+		mensagem := fmt.Sprintf("\nAdversário encontrado: %s\n-", Cliente2.nome)
+		Cliente1.conexao.Write([]byte(mensagem))
+		mensagem = fmt.Sprintf("\nAdversário encontrado: %s\n-", Cliente1.nome)
+		Cliente2.conexao.Write([]byte(mensagem))
 		switch primeiroJogador{
 		case 0:
-			jogador1.conexao.Write([]byte("Você é o primeiro a jogar!\n-"))
-			jogador2.conexao.Write([]byte("Você é o segundo a jogar!\n-"))
+			Cliente1.conexao.Write([]byte("Você é o primeiro a jogar!\n-"))
+			Cliente2.conexao.Write([]byte("Você é o segundo a jogar!\n-"))
 		case 1:
-			jogador2.conexao.Write([]byte("\tVocê é o primeiro a jogar!\n-"))
-			jogador1.conexao.Write([]byte("\tVocê é o segundo a jogar!\n-"))
+			Cliente2.conexao.Write([]byte("\tVocê é o primeiro a jogar!\n-"))
+			Cliente1.conexao.Write([]byte("\tVocê é o segundo a jogar!\n-"))
 		}
 	}
 }
@@ -170,11 +181,11 @@ func desconectarCliente(cliente *Cliente) {
 		partida, ok := partidas[cliente.jogoID]
 		if ok {
 			for _, jogador := range partida.jogadores {
-				if jogador.nome != cliente.nome {
+				if jogador.cliente.nome != cliente.nome {
 					mensagem := fmt.Sprintf("\t------! %s saiu do jogo, a partida acabou------ pressione 'Enter' para voltar ao menu\n-", cliente.nome)
-					jogador.conexao.Write(([]byte(mensagem)))
-					jogador.jogoID = ""
-					jogador.estado = ""
+					jogador.cliente.conexao.Write(([]byte(mensagem)))
+					jogador.cliente.jogoID = ""
+					jogador.cliente.estado = ""
 				}
 			}
 			delete(partidas, cliente.jogoID)
@@ -202,11 +213,11 @@ func encaminharMensagem(remetente *Cliente, mensagem string) {
 	if ok {
 		if partida.turno == remetente.nome{
 			for _, destinatario := range partida.jogadores {
-				if destinatario.nome != remetente.nome {
+				if destinatario.cliente.nome != remetente.nome {
 					mensagem := fmt.Sprintf("[%s]: %s\n-", remetente.nome, mensagem)
-					destinatario.conexao.Write([]byte(mensagem))
-					partida.turno = destinatario.nome
-					destinatario.conexao.Write([]byte(">>> É o seu turno!\n-"))
+					destinatario.cliente.conexao.Write([]byte(mensagem))
+					partida.turno = destinatario.cliente.nome
+					destinatario.cliente.conexao.Write([]byte(">>> É o seu turno!\n-"))
 					remetente.conexao.Write([]byte(">>> Turno do seu oponente\n-"))
 				}
 			}
