@@ -54,17 +54,32 @@ func main() {
 				fmt.Printf("Contra: %s | Primeiro a jogar: %s\n", dadosPartida.Oponente, dadosPartida.PrimeiroJogar)
 				fmt.Println("------------------------")
 				estadoCliente = "jogando"
+				exibirMenuPartida()
 
 			case "notfServidor":
 				var notif protocolo.Mensagem
 				json.Unmarshal(msgServidor.Dados, &notif)
 				fmt.Printf("\n--- SERVIDOR: %s ---\n", notif.Mensagem)
 
-			case "mensagem":
-				var msg protocolo.Mensagem
-				json.Unmarshal(msgServidor.Dados, &msg)
-				fmt.Printf("\n[%s]: %s\n", msg.Remetente, msg.Mensagem)
-			
+			case "resJogada":
+				var resJogada protocolo.RespostaJogada
+				json.Unmarshal(msgServidor.Dados, &resJogada)
+				fmt.Printf("Você conseguiu um %s\n+%d pontos!\nTotal de pontos:%d\n", resJogada.Carta, resJogada.PontosCarta, resJogada.PontosTotal)
+
+			case "fimPartida":
+				var dadosPartida protocolo.FimPartida
+				json.Unmarshal(msgServidor.Dados, &dadosPartida)
+				for nome, pontos := range dadosPartida.Pontos{
+					fmt.Printf("%s conseguiu %d pontos\n", nome, pontos)
+				}
+				if dadosPartida.Ganhador != "empate"{
+					fmt.Printf("%s GANHOU!\n", dadosPartida.Ganhador)
+				} else{
+					fmt.Println("EMPATE")
+				}
+				estadoCliente = "menu"
+				exibirMenu(estadoCliente)
+
 			case "saiuPartida":
 				var msg protocolo.Mensagem
 				json.Unmarshal(msgServidor.Dados, &msg) 
@@ -91,8 +106,16 @@ func main() {
 					enviar = false
 				}
 			case "jogando":
-				dados, _ := json.Marshal(protocolo.Mensagem{Mensagem: input})
-				msgParaEnviar = protocolo.Envelope{Requisicao: "enviarmsg", Dados: dados}
+				switch input {
+				case "1":
+					dados,_:= json.Marshal(protocolo.Jogada{Acao: "pegarCarta"})
+					msgParaEnviar = protocolo.Envelope{Requisicao: "jogada", Dados: dados}
+				case "2":
+					dados,_:= json.Marshal(protocolo.Jogada{Acao: "pararCartas"})
+					msgParaEnviar = protocolo.Envelope{Requisicao: "jogada", Dados: dados}
+				default:
+					fmt.Println("Opção inválida.")
+				}
 			case "esperando":
 				fmt.Println("Aguardando um adversário, por favor espere...")
 				enviar = false
@@ -133,4 +156,29 @@ func exibirMenu(estado string) {
 		fmt.Println("\n--- VOCÊ ESTÁ NO MENU ---")
 		fmt.Println("Digite 'PROCURAR' para encontrar uma partida.")
 	}
+}
+
+func exibirMenuPartida(){
+	fmt.Println("\n\tSELECIONE SUA JOGADA!")
+	fmt.Println("1-Pegar Carta")
+	fmt.Println("2-Parar de pegar cartas")
+}
+
+func verRegras(){
+	fmt.Println("\nEsse jogo é uma versão simplificada de 21")
+	fmt.Println("Seu objetivo é conseguir o mais perto possivil de 21 pontos")
+	fmt.Println("As cartas valem:")
+	fmt.Println("K: 10")
+	fmt.Println("Q: 10")
+	fmt.Println("J: 10")
+	fmt.Println("10: 10")
+	fmt.Println("9: 9")
+	fmt.Println("8: 8")
+	fmt.Println("7: 7")
+	fmt.Println("6: 6")
+	fmt.Println("5: 5")
+	fmt.Println("4: 4")
+	fmt.Println("3: 3")
+	fmt.Println("2: 2")
+	fmt.Println("A: 1")
 }

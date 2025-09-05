@@ -22,9 +22,8 @@ type Confirmacao struct{
 	Resultado bool
 }
 
-type Mensagem struct{ //temporario, usado enquanto não ha funções de jogo
+type Mensagem struct{ 
 	Mensagem string
-	Remetente string
 }
 
 type Jogada struct{
@@ -38,8 +37,8 @@ type RespostaJogada struct{
 }
 
 type FimPartida struct{
-	Resultado string
-	pontos map[string]int
+	Ganhador string
+	Pontos map[string]int
 	//skins map[string](map[string]string)
 	//ou
 	//maos map[string]([]string)

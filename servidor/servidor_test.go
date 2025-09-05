@@ -5,6 +5,7 @@ package main
 import (
 	"encoding/json"
 	"fmt"
+	"math/rand"
 	"net"
 	"projeto-rede/protocolo"
 	"sync"
@@ -13,7 +14,7 @@ import (
 )
 
 func TestMatchmakingConcorrente(t *testing.T) {
-	const numClientes = 200
+	const numClientes = 1200
 	const addr = "localhost:8080"
 
 
@@ -31,6 +32,8 @@ func TestMatchmakingConcorrente(t *testing.T) {
 		//Inicia cada cleinet simulado com uma goroutine diferente
 		go func(id int) {
 			defer wg.Done()
+
+			time.Sleep(time.Duration(rand.Intn(500)) * time.Millisecond)
 
 			//conexão
 			conexao, err := net.Dial("tcp", addr)
@@ -121,10 +124,10 @@ func TestMatchmakingConcorrente(t *testing.T) {
 				t.Errorf("Inconsistência: Jogador %s foi pareado com %s, mas %s não registrou nenhuma partida.", jogador, oponente, oponente)
 			} else if oponenteDoOponente != jogador {
 				t.Errorf("Inconsistência de par: %s acha que jogou com %s, mas %s acha que jogou com %s.", jogador, oponente, oponente, oponenteDoOponente)
-			} else if oponenteDoOponente == jogador{
+			} /*else if oponenteDoOponente == jogador{
 				fmt.Printf("Partida criada corretamente! %s x %s\n", jogador, oponente)
-			}
+			}*/
 		}
 	})
-	fmt.Println("Teste de concorrência finalizado.")
+	fmt.Println("Teste de concorrência finalizado.\n\nRESULTADOS:")
 }
