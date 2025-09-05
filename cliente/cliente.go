@@ -33,7 +33,8 @@ func main() {
 	fmt.Println("Digite seu nome de usuário para fazer o login:")
 	fmt.Print(">> ")
 
-	for {
+	sair := false
+	for !sair{
 		select {
 		case msgServidor := <-mensagensDoServidor:
 			switch msgServidor.Requisicao {
@@ -107,11 +108,32 @@ func main() {
 				dados, _ := json.Marshal(protocolo.Login{Nome: input})
 				msgParaEnviar = protocolo.Envelope{Requisicao: "login", Dados: dados}
 			case "menu":
-				if strings.ToUpper(input) == "PROCURAR" {
+				switch input {
+				case "1":
 					msgParaEnviar = protocolo.Envelope{Requisicao: "procurar"}
 					estadoCliente = "esperando"
-				} else {
+				case "2":
+					estilo.Clear()
+					fmt.Println("Ainda não é possivel abir pacotes 😿")
+					exibirMenu()
+					enviar = false
+				case "3":
+					estilo.Clear()
+					fmt.Println("Ainda não é possivel ver o PING 😿")
+					exibirMenu()
+					enviar = false
+				case "4":
+					estilo.Clear()
+					verRegras()
+					exibirMenu()
+					enviar = false
+				case "5":
+					sair = true
+					enviar = false
+				default:
+					estilo.Clear()
 					estilo.PrintVerm("❌Opção inválida no menu.\n")
+					exibirMenu()
 					enviar = false
 				}
 			case "jogando":
@@ -137,9 +159,9 @@ func main() {
 			}
 		}
 	}
+	estilo.PrintCian("desconectando....\n até mais👋\n")
 }
 
-// As goroutines de 'sentidos' continuam as mesmas
 func receberMensagens(conexao net.Conn) {
 	decodificador := json.NewDecoder(conexao)
 	for {
@@ -161,8 +183,13 @@ func lerInputDoUsuario() {
 }
 
 func exibirMenu() {
-	fmt.Println("\n--- VOCÊ ESTÁ NO MENU ---")
-	fmt.Println("Digite 'PROCURAR' para encontrar uma partida.")
+	fmt.Println("\n--- MENU ---")
+	fmt.Println("Digite:")
+	fmt.Println("1-Procurar uma partida")
+	fmt.Println("2-Abrir Pacote")
+	fmt.Println("3-Ver PING")
+	fmt.Println("4-Ver regras do jogo")
+	fmt.Println("5-Sair")
 
 }
 

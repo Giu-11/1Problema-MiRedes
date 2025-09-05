@@ -23,6 +23,7 @@ var partidasMutex = &sync.Mutex{}
 var esperaMutex = &sync.Mutex{}
 
 func main() {
+	estilo.Clear()
 	fmt.Println("Servidor iniciado, aguardando conexões na porta 8080...")
 	ouvinte, err := net.Listen("tcp", ":8080")
 	if err != nil {
@@ -311,7 +312,7 @@ func finalizarPartida(partida *servUtils.Partida, cliente *servUtils.Cliente, ad
 
 func fecharPartida(partida *servUtils.Partida) {
 	for _, jogador := range partida.Jogadores {
-		estilo.PrintMag("FIM DE PARTIDA")
+		estilo.PrintMag("FIM DE PARTIDA\n")
 		jogador.Cliente.Jogador = nil
 		jogador.Cliente.JogoID = ""
 		jogador.Cliente.Estado = ""
