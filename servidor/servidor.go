@@ -56,28 +56,12 @@ func lidarComConexao(conexao net.Conn) {
 
 	sair := false
 	for !sair {
-		//
 		var envelope protocolo.Envelope
 		err := decodificador.Decode(&envelope)
 		if err == nil {
 			switch envelope.Requisicao {
 			case "login":
-				if cliente.Estado == "login" {
-					var dadosLogin protocolo.Login
-					err := json.Unmarshal(envelope.Dados, &dadosLogin)
-					if err == nil {
-						if tentarLogin(dadosLogin) {
-							cliente.Nome = dadosLogin.Nome
-							cliente.Estado = ""
-							addListaClientes(cliente)
-							servUtils.EnviarResposta(*codificador, "confirmacao", "login", true)
-						} else {
-							servUtils.EnviarResposta(*codificador, "confirmacao", "login", false)
-						}
-					}
-				} else {
-					servUtils.EnviarAviso(*codificador, "Ação inválida")
-				}
+				login(cliente, &envelope, codificador)
 			case "procurar":
 				if cliente.Estado == "" {
 					cliente.Estado = "esperando"
@@ -99,6 +83,25 @@ func lidarComConexao(conexao net.Conn) {
 			fmt.Printf("Cliente %s perdeu a conexão. Erro: %v\n", cliente.Nome, err)
 			sair = true
 		}
+	}
+}
+
+func login(cliente *servUtils.Cliente, envelope *protocolo.Envelope, codificador *json.Encoder){
+	if cliente.Estado == "login" {
+		var dadosLogin protocolo.Login
+		err := json.Unmarshal(envelope.Dados, &dadosLogin)
+		if err == nil {
+			if tentarLogin(dadosLogin) {
+				cliente.Nome = dadosLogin.Nome
+				cliente.Estado = ""
+				addListaClientes(cliente)
+				servUtils.EnviarResposta(*codificador, "confirmacao", "login", true)
+			} else {
+				servUtils.EnviarResposta(*codificador, "confirmacao", "login", false)
+			}
+		}
+	} else {
+		servUtils.EnviarAviso(*codificador, "Ação inválida")
 	}
 }
 
@@ -188,8 +191,6 @@ func verificarEspera() {
 	}
 }
 
-
-
 func desconectarCliente(cliente *servUtils.Cliente) {
 	esperaMutex.Lock()
 	novaFila := []*servUtils.Cliente{}
@@ -249,43 +250,46 @@ func lidarComJogada(cliente *servUtils.Cliente, jogada protocolo.Jogada, codific
 		if partida.Turno == cliente.Nome {
 			switch jogada.Acao {
 			case "pegarCarta":
-				//pode separar em uma função
-				if len(partida.Cartas) > 0{
-					carta := partida.Cartas[0]
-					partida.Cartas = partida.Cartas[1:]
-					cliente.Jogador.Mao = append(cliente.Jogador.Mao, carta)
-					pontos := cartasUtils.TradutorPontos(carta)
-					cliente.Jogador.Pontos += pontos
-					servUtils.EnviarResJogada(codificador, carta, pontos, cliente)
-
-					servUtils.EnviarAviso(*codificadorAdiversario, "Seu adversário pegou uma carta")
-					if !adversario.ParouCartas {
-						partida.Turno = adversario.Cliente.Nome
-						servUtils.EnviarAviso(*codificadorAdiversario, " É o seu turno!")
-					} else {
-						servUtils.EnviarAviso(codificador, " É o seu turno!")
-					}
-				} else{
-					servUtils.EnviarAviso(codificador, "Não há mais cartas")
-					finalizarPartida(partida, cliente, adversario, &codificador, codificadorAdiversario)
-				}
+				pegarCarta(partida, cliente, adversario, codificador, *codificadorAdiversario)
 			case "pararCartas":
-				cliente.Jogador.ParouCartas = true
-				servUtils.EnviarAviso(codificador, "Você parou de pegar cartas")
-				if adversario.ParouCartas {
-					//pode separar em uma função
-					//decide o vencedor, avisa quem foi e finaliza partida
-					finalizarPartida(partida, cliente, adversario, &codificador, codificadorAdiversario)
-				} else {
-					servUtils.EnviarAviso(*codificadorAdiversario, " É o seu turno!")
-					servUtils.EnviarAviso(*codificadorAdiversario, "Seu adversário parou de pegar cartas")
-					partida.Turno = adversario.Cliente.Nome
-				}
+				pararCartas(cliente, adversario, partida, &codificador, codificadorAdiversario)
 			}
 		} else{
 			servUtils.EnviarAviso(codificador, "❌ Não é o seu turno! ❌")
 		}
 	}
+}
+
+func pegarCarta(partida *servUtils.Partida, cliente *servUtils.Cliente, adversario *servUtils.Jogador, codificador json.Encoder, codificadorAdiversario json.Encoder){
+	if len(partida.Cartas) > 0{
+		carta := partida.Cartas[0]
+		partida.Cartas = partida.Cartas[1:]
+		cliente.Jogador.Mao = append(cliente.Jogador.Mao, carta)
+		pontos := cartasUtils.TradutorPontos(carta)
+		cliente.Jogador.Pontos += pontos
+		servUtils.EnviarResJogada(codificador, carta, pontos, cliente)
+
+		servUtils.EnviarAviso(codificadorAdiversario, "Seu adversário pegou uma carta")
+		if !adversario.ParouCartas {
+			partida.Turno = adversario.Cliente.Nome
+		}
+		servUtils.EnviarAviso(codificadorAdiversario, " É o seu turno!")
+	} else{
+		servUtils.EnviarAviso(codificador, "Não há mais cartas")
+		finalizarPartida(partida, cliente, adversario, &codificador, &codificadorAdiversario)
+	}
+}
+
+func pararCartas(cliente *servUtils.Cliente, adversario *servUtils.Jogador, partida *servUtils.Partida, codificador *json.Encoder, codificadorAdiversario *json.Encoder){
+	cliente.Jogador.ParouCartas = true
+				servUtils.EnviarAviso(*codificador, "Você parou de pegar cartas")
+				if adversario.ParouCartas {
+					finalizarPartida(partida, cliente, adversario, codificador, codificadorAdiversario)
+				} else {
+					servUtils.EnviarAviso(*codificadorAdiversario, " É o seu turno!")
+					servUtils.EnviarAviso(*codificadorAdiversario, "Seu adversário parou de pegar cartas")
+					partida.Turno = adversario.Cliente.Nome
+				}
 }
 
 func finalizarPartida(partida *servUtils.Partida, cliente *servUtils.Cliente, adversario *servUtils.Jogador, codificador *json.Encoder, codificadorAdiversario *json.Encoder){
