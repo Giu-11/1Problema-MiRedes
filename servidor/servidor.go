@@ -7,6 +7,7 @@ import (
 	"math/rand"
 	"net"
 	"projeto-rede/cartasUtils"
+	"projeto-rede/estilo"
 	"projeto-rede/protocolo"
 	"projeto-rede/servUtils"
 	"strconv"
@@ -25,7 +26,8 @@ func main() {
 	fmt.Println("Servidor iniciado, aguardando conexões na porta 8080...")
 	ouvinte, err := net.Listen("tcp", ":8080")
 	if err != nil {
-		fmt.Println("\033[31mErro ao iniciar o servidor:", err, "\033[0m")
+		msg:=fmt.Sprintf("Erro ao iniciar o servidor:%s\n",err)
+		estilo.PrintVerm(msg)
 		return
 	}
 	defer ouvinte.Close()
@@ -34,7 +36,8 @@ func main() {
 
 		conexao, err := ouvinte.Accept()
 		if err != nil {
-			fmt.Println("\033[31mErro ao aceitar conexão:", err, "\033[0m")
+			msg:=fmt.Sprintf("Erro ao aceitar conexão:%s\n",err)
+			estilo.PrintVerm(msg)
 			continue
 		}
 		go lidarComConexao(conexao)
@@ -42,7 +45,8 @@ func main() {
 }
 
 func lidarComConexao(conexao net.Conn) {
-	fmt.Println("\033[32mNovo cliente conectado:", conexao.RemoteAddr().String(), "\033[0m")
+	msg:=fmt.Sprintf("Novo cliente conectado:%s\n", conexao.RemoteAddr().String())
+	estilo.PrintVerd(msg)
 	decodificador := json.NewDecoder(conexao)
 	codificador := json.NewEncoder(conexao)
 
@@ -145,7 +149,8 @@ func verificarEspera() {
 		Cliente2.Jogador = jogador2
 
 		filaEspera = filaEspera[2:]
-		fmt.Printf("INICIANDO PARTIDA: %s x %s\n", Cliente1.Nome, Cliente2.Nome)
+		msg := fmt.Sprintf("INICIANDO PARTIDA: %s x %s\n", Cliente1.Nome, Cliente2.Nome)
+		estilo.PrintCian(msg)
 		jogoID := "jogo:" + strconv.FormatInt(time.Now().UnixNano(), 10)
 
 		partidasMutex.Lock()
@@ -223,7 +228,8 @@ func desconectarCliente(cliente *servUtils.Cliente) {
 	clientesMutex.Unlock()
 
 	cliente.Conexao.Close()
-	fmt.Printf("\033[31mCliente desconectado: %s\n\033[0m", cliente.Nome)
+	msg:=fmt.Sprintf("Cliente desconectado: %s\n", cliente.Nome)
+	estilo.PrintVerm(msg)
 
 }
 
@@ -255,9 +261,9 @@ func lidarComJogada(cliente *servUtils.Cliente, jogada protocolo.Jogada, codific
 					servUtils.EnviarAviso(*codificadorAdiversario, "Seu adversário pegou uma carta")
 					if !adversario.ParouCartas {
 						partida.Turno = adversario.Cliente.Nome
-						servUtils.EnviarAviso(*codificadorAdiversario, ">>> É o seu turno!")
+						servUtils.EnviarAviso(*codificadorAdiversario, " É o seu turno!")
 					} else {
-						servUtils.EnviarAviso(codificador, ">>> É o seu turno!")
+						servUtils.EnviarAviso(codificador, " É o seu turno!")
 					}
 				} else{
 					servUtils.EnviarAviso(codificador, "Não há mais cartas")
@@ -271,13 +277,13 @@ func lidarComJogada(cliente *servUtils.Cliente, jogada protocolo.Jogada, codific
 					//decide o vencedor, avisa quem foi e finaliza partida
 					finalizarPartida(partida, cliente, adversario, &codificador, codificadorAdiversario)
 				} else {
-					servUtils.EnviarAviso(*codificadorAdiversario, ">>> É o seu turno!")
+					servUtils.EnviarAviso(*codificadorAdiversario, " É o seu turno!")
 					servUtils.EnviarAviso(*codificadorAdiversario, "Seu adversário parou de pegar cartas")
 					partida.Turno = adversario.Cliente.Nome
 				}
 			}
 		} else{
-			servUtils.EnviarAviso(codificador, ">>> Não é o seu turno!")
+			servUtils.EnviarAviso(codificador, "❌ Não é o seu turno! ❌")
 		}
 	}
 }
@@ -301,7 +307,7 @@ func finalizarPartida(partida *servUtils.Partida, cliente *servUtils.Cliente, ad
 
 func fecharPartida(partida *servUtils.Partida) {
 	for _, jogador := range partida.Jogadores {
-		fmt.Println("FIM DE PARTIDA")
+		estilo.PrintMag("FIM DE PARTIDA")
 		jogador.Cliente.Jogador = nil
 		jogador.Cliente.JogoID = ""
 		jogador.Cliente.Estado = ""

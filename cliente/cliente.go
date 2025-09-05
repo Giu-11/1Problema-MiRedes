@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"net"
 	"os"
+	"projeto-rede/estilo"
 	"projeto-rede/protocolo"
 	"strings"
 )
@@ -27,7 +28,8 @@ func main() {
 	go lerInputDoUsuario()
 
 	estadoCliente := "login"
-	fmt.Println("--- Bem-vindo! ---")
+	estilo.Clear()
+	fmt.Println("\n--- Bem-vindo! ---")
 	fmt.Println("Digite seu nome de usuário para fazer o login:")
 	fmt.Print(">> ")
 
@@ -39,15 +41,17 @@ func main() {
 				var conf protocolo.Confirmacao
 				json.Unmarshal(msgServidor.Dados, &conf)
 				if conf.Assunto == "login" && conf.Resultado {
-					fmt.Println("\n✅Login realizado com sucesso!")
+					estilo.Clear()
+					estilo.PrintVerd("\n✅ Login realizado com sucesso!\n")
 					estadoCliente = "menu"
-					exibirMenu(estadoCliente)
+					exibirMenu()
 				} else {
-					fmt.Println("\n⚠️Falha no login. Tente outro nome.")
+					estilo.PrintVerm("\n⚠️ Falha no login. Tente outro nome.\n")
 					estadoCliente = "login"
 				}
 
 			case "inicioPartida":
+				estilo.Clear()
 				var dadosPartida protocolo.InicioPartida
 				json.Unmarshal(msgServidor.Dados, &dadosPartida)
 				fmt.Printf("\n🃏--- PARTIDA INICIADA ---🃏\n")
@@ -59,7 +63,8 @@ func main() {
 			case "notfServidor":
 				var notif protocolo.Mensagem
 				json.Unmarshal(msgServidor.Dados, &notif)
-				fmt.Printf("\n--- SERVIDOR: %s ---\n", notif.Mensagem)
+				msg := fmt.Sprintf("\n--- %s ---\n", notif.Mensagem)
+				estilo.PrintAma(msg)
 
 			case "resJogada":
 				var resJogada protocolo.RespostaJogada
@@ -67,25 +72,29 @@ func main() {
 				fmt.Printf("Você conseguiu um %s\n+%d pontos!\nTotal de pontos:%d\n", resJogada.Carta, resJogada.PontosCarta, resJogada.PontosTotal)
 
 			case "fimPartida":
+				estilo.Clear()
 				var dadosPartida protocolo.FimPartida
 				json.Unmarshal(msgServidor.Dados, &dadosPartida)
 				for nome, pontos := range dadosPartida.Pontos{
 					fmt.Printf("%s conseguiu %d pontos\n", nome, pontos)
 				}
 				if dadosPartida.Ganhador != "empate"{
-					fmt.Printf("%s GANHOU🎉!\n", dadosPartida.Ganhador)
+					msg := fmt.Sprintf("%s GANHOU🎉!\n", dadosPartida.Ganhador)
+					estilo.PrintVerd(msg)
 				} else{
 					fmt.Println("EMPATE")
 				}
 				estadoCliente = "menu"
-				exibirMenu(estadoCliente)
+				exibirMenu()
 
 			case "saiuPartida":
-				var msg protocolo.Mensagem
-				json.Unmarshal(msgServidor.Dados, &msg) 
-				fmt.Printf("\n--- ⚠️%s⚠️ ---\n", msg.Mensagem)
+				estilo.Clear()
+				var mensagem protocolo.Mensagem
+				json.Unmarshal(msgServidor.Dados, &mensagem) 
+				msg := fmt.Sprintf("\n--- ⚠️%s⚠️ ---\n", mensagem.Mensagem)
+				estilo.PrintVerm(msg)
 				estadoCliente = "menu"
-				exibirMenu(estadoCliente)
+				exibirMenu()
 			}
 			fmt.Print(">> ")
 
@@ -102,7 +111,7 @@ func main() {
 					msgParaEnviar = protocolo.Envelope{Requisicao: "procurar"}
 					estadoCliente = "esperando"
 				} else {
-					fmt.Println("❌Opção inválida no menu.")
+					estilo.PrintVerm("❌Opção inválida no menu.\n")
 					enviar = false
 				}
 			case "jogando":
@@ -114,7 +123,7 @@ func main() {
 					dados,_:= json.Marshal(protocolo.Jogada{Acao: "pararCartas"})
 					msgParaEnviar = protocolo.Envelope{Requisicao: "jogada", Dados: dados}
 				default:
-					fmt.Println("❌Opção inválida.")
+					estilo.PrintVerm("❌Opção inválida.\n")
 				}
 			case "esperando":
 				fmt.Println("⌛Aguardando um adversário, por favor espere...⌛")
@@ -136,7 +145,7 @@ func receberMensagens(conexao net.Conn) {
 	for {
 		var msg protocolo.Envelope
 		if err := decodificador.Decode(&msg); err != nil {
-			fmt.Println("\n⛓️‍💥Conexão perdida com o servidor.")
+			estilo.PrintVerm("\n⛓️‍💥Conexão perdida com o servidor.")
 			os.Exit(0)
 		}
 		mensagensDoServidor <- msg
@@ -151,11 +160,10 @@ func lerInputDoUsuario() {
 	}
 }
 
-func exibirMenu(estado string) {
-	if estado == "menu" {
-		fmt.Println("\n--- VOCÊ ESTÁ NO MENU ---")
-		fmt.Println("Digite 'PROCURAR' para encontrar uma partida.")
-	}
+func exibirMenu() {
+	fmt.Println("\n--- VOCÊ ESTÁ NO MENU ---")
+	fmt.Println("Digite 'PROCURAR' para encontrar uma partida.")
+
 }
 
 func exibirMenuPartida(){
@@ -181,5 +189,5 @@ func verRegras(){
 	fmt.Println("3: 3")
 	fmt.Println("2: 2")
 	fmt.Println("A: 1")
-	fmt.Println("Em cada turno você pode escolher pegar uma carta, ou parar de pegar cartas finalizando suas jogadas\n")
+	fmt.Println("Em cada turno você pode escolher pegar uma carta, ou parar de pegar cartas finalizando suas jogadas")
 }
