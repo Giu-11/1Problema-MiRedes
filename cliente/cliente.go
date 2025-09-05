@@ -39,18 +39,18 @@ func main() {
 				var conf protocolo.Confirmacao
 				json.Unmarshal(msgServidor.Dados, &conf)
 				if conf.Assunto == "login" && conf.Resultado {
-					fmt.Println("\nLogin realizado com sucesso!")
+					fmt.Println("\n✅Login realizado com sucesso!")
 					estadoCliente = "menu"
 					exibirMenu(estadoCliente)
 				} else {
-					fmt.Println("\nFalha no login. Tente outro nome.")
+					fmt.Println("\n⚠️Falha no login. Tente outro nome.")
 					estadoCliente = "login"
 				}
 
 			case "inicioPartida":
 				var dadosPartida protocolo.InicioPartida
 				json.Unmarshal(msgServidor.Dados, &dadosPartida)
-				fmt.Printf("\n--- PARTIDA INICIADA ---\n")
+				fmt.Printf("\n🃏--- PARTIDA INICIADA ---🃏\n")
 				fmt.Printf("Contra: %s | Primeiro a jogar: %s\n", dadosPartida.Oponente, dadosPartida.PrimeiroJogar)
 				fmt.Println("------------------------")
 				estadoCliente = "jogando"
@@ -73,7 +73,7 @@ func main() {
 					fmt.Printf("%s conseguiu %d pontos\n", nome, pontos)
 				}
 				if dadosPartida.Ganhador != "empate"{
-					fmt.Printf("%s GANHOU!\n", dadosPartida.Ganhador)
+					fmt.Printf("%s GANHOU🎉!\n", dadosPartida.Ganhador)
 				} else{
 					fmt.Println("EMPATE")
 				}
@@ -83,7 +83,7 @@ func main() {
 			case "saiuPartida":
 				var msg protocolo.Mensagem
 				json.Unmarshal(msgServidor.Dados, &msg) 
-				fmt.Printf("\n--- %s ---\n", msg.Mensagem)
+				fmt.Printf("\n--- ⚠️%s⚠️ ---\n", msg.Mensagem)
 				estadoCliente = "menu"
 				exibirMenu(estadoCliente)
 			}
@@ -102,7 +102,7 @@ func main() {
 					msgParaEnviar = protocolo.Envelope{Requisicao: "procurar"}
 					estadoCliente = "esperando"
 				} else {
-					fmt.Println("Opção inválida no menu.")
+					fmt.Println("❌Opção inválida no menu.")
 					enviar = false
 				}
 			case "jogando":
@@ -114,10 +114,10 @@ func main() {
 					dados,_:= json.Marshal(protocolo.Jogada{Acao: "pararCartas"})
 					msgParaEnviar = protocolo.Envelope{Requisicao: "jogada", Dados: dados}
 				default:
-					fmt.Println("Opção inválida.")
+					fmt.Println("❌Opção inválida.")
 				}
 			case "esperando":
-				fmt.Println("Aguardando um adversário, por favor espere...")
+				fmt.Println("⌛Aguardando um adversário, por favor espere...⌛")
 				enviar = false
 			}
 
@@ -136,7 +136,7 @@ func receberMensagens(conexao net.Conn) {
 	for {
 		var msg protocolo.Envelope
 		if err := decodificador.Decode(&msg); err != nil {
-			fmt.Println("\nConexão perdida com o servidor.")
+			fmt.Println("\n⛓️‍💥Conexão perdida com o servidor.")
 			os.Exit(0)
 		}
 		mensagensDoServidor <- msg
@@ -181,4 +181,5 @@ func verRegras(){
 	fmt.Println("3: 3")
 	fmt.Println("2: 2")
 	fmt.Println("A: 1")
+	fmt.Println("Em cada turno você pode escolher pegar uma carta, ou parar de pegar cartas finalizando suas jogadas\n")
 }
