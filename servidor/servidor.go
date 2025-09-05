@@ -121,12 +121,16 @@ func lidarComConexao(conexao net.Conn) {
 }
 
 func tentarLogin(dadosLogin protocolo.Login) bool {
-	//TODO: logica para login
 	if dadosLogin.Nome != "" {
-		return true
-	} else {
-		return false
+		clientesMutex.Lock()
+		defer clientesMutex.Unlock()
+		_, existe := clientes[dadosLogin.Nome]
+		if !existe{
+			return true
+		}
 	}
+	return false
+	
 }
 
 func addListaClientes(cliente *Cliente) {
@@ -308,6 +312,8 @@ func lidarComJogada(cliente *Cliente, jogada protocolo.Jogada, codificador json.
 					partida.turno = adversario.cliente.nome
 				}
 			}
+		} else{
+			enviarAviso(codificador, ">>> Não é o seu turno!")
 		}
 	}
 }
