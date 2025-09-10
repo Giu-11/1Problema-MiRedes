@@ -41,14 +41,21 @@ func main() {
 			case "confirmacao":
 				var conf protocolo.Confirmacao
 				json.Unmarshal(msgServidor.Dados, &conf)
-				if conf.Assunto == "login" && conf.Resultado {
-					estilo.Clear()
-					estilo.PrintVerd("\n✅ Login realizado com sucesso!\n")
-					estadoCliente = "menu"
-					exibirMenu()
-				} else {
-					estilo.PrintVerm("\n⚠️ Falha no login. Tente outro nome.\n")
-					estadoCliente = "login"
+				switch conf.Assunto{
+				case "login":
+					if conf.Resultado{
+						estilo.Clear()
+						estilo.PrintVerd("\n✅ Login realizado com sucesso!\n")
+						estadoCliente = "menu"
+						exibirMenu()
+					}else{
+						estilo.PrintVerm("\n⚠️ Falha no login. Tente outro nome.\n")
+						estadoCliente = "login"
+					}
+				case "pacote":
+					if !conf.Resultado{
+						estilo.PrintVerm("Não há mais pacotes!❌")
+					}
 				}
 
 			case "inicioPartida":
@@ -96,6 +103,23 @@ func main() {
 				estilo.PrintVerm(msg)
 				estadoCliente = "menu"
 				exibirMenu()
+
+			case "novaCarta":
+				estilo.Clear()
+				var dadosCarta protocolo.CartaNova
+				json.Unmarshal(msgServidor.Dados, &dadosCarta)
+				msg := fmt.Sprintf("Você obteve: %s%s", dadosCarta.Valor, dadosCarta.Naipe)
+				estadoCliente = "menu"
+				estilo.PrintCian(msg)
+				exibirMenu()
+
+			case "todasCartas":
+				estilo.Clear()
+				var cartas protocolo.TodasCartas
+				json.Unmarshal(msgServidor.Dados, &cartas)
+				mostraCartas(cartas.Cartas)
+				exibirMenu()
+				estadoCliente = "menu"
 			}
 			fmt.Print(">> ")
 
@@ -113,10 +137,9 @@ func main() {
 					msgParaEnviar = protocolo.Envelope{Requisicao: "procurar"}
 					estadoCliente = "esperando"
 				case "2":
-					estilo.Clear()
-					fmt.Println("Ainda não é possivel abir pacotes 😿")
-					exibirMenu()
-					enviar = false
+					estadoCliente = "abrindoPacote"
+					msgParaEnviar = protocolo.Envelope{Requisicao: "abrirPacote"}
+					//fmt.Println("Ainda não é possivel abir pacotes 😿")
 				case "3":
 					estilo.Clear()
 					fmt.Println("Ainda não é possivel ver o PING 😿")
@@ -128,8 +151,13 @@ func main() {
 					exibirMenu()
 					enviar = false
 				case "5":
+					msgParaEnviar = protocolo.Envelope{Requisicao: "verCartas"}
+					estadoCliente = "abrindoPacote"
+
+				case "6":
 					sair = true
 					enviar = false
+
 				default:
 					estilo.Clear()
 					estilo.PrintVerm("❌Opção inválida no menu.\n")
@@ -182,6 +210,17 @@ func lerInputDoUsuario() {
 	}
 }
 
+func mostraCartas(cartas map[string]map[string]int){
+	for valor, naipes := range cartas{
+		fmt.Printf("\n")
+		for naipe, quantidade := range naipes{
+			fmt.Printf("%s%s x%d\t\t", valor, naipe, quantidade)
+		}
+	}
+	fmt.Printf("\n")
+}
+
+
 func exibirMenu() {
 	fmt.Println("\n--- MENU ---")
 	fmt.Println("Digite:")
@@ -189,7 +228,8 @@ func exibirMenu() {
 	fmt.Println("2-Abrir Pacote")
 	fmt.Println("3-Ver PING")
 	fmt.Println("4-Ver regras do jogo")
-	fmt.Println("5-Sair")
+	fmt.Println("5-Ver suas cartas")
+	fmt.Println("6-Sair")
 
 }
 
@@ -201,7 +241,7 @@ func exibirMenuPartida(){
 
 func verRegras(){
 	fmt.Println("\nEsse jogo é uma versão simplificada de 21")
-	fmt.Println("Seu objetivo é conseguir o mais perto possivil de 21 pontos")
+	fmt.Println("Seu objetivo é conseguir o mais perto possivel de 21 pontos")
 	fmt.Println("As cartas valem:")
 	fmt.Println("K: 10")
 	fmt.Println("Q: 10")

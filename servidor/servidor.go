@@ -24,6 +24,8 @@ var esperaMutex = &sync.Mutex{}
 
 func main() {
 	estilo.Clear()
+	cartasUtils.CriadorEstoque()
+	fmt.Println("Estoque de cartas gerado")
 	fmt.Println("Servidor iniciado, aguardando conexões na porta 8080...")
 	ouvinte, err := net.Listen("tcp", ":8080")
 	if err != nil {
@@ -78,6 +80,20 @@ func lidarComConexao(conexao net.Conn) {
 					if err == nil {
 						lidarComJogada(cliente, jogada, *codificador)
 					}
+				}
+			case "abrirPacote":
+				if cliente.Estado == "" {
+					valor, naipe := cartasUtils.AbrirPacote()
+					if valor != "" && naipe != ""{
+						addCartaCliente(valor, naipe, cliente)
+						servUtils.EnviarNovaCarta(codificador, valor, naipe)
+					} else {
+						servUtils.EnviarResposta(*codificador, "confirmacao", "pacote", false)
+					}
+				}
+			case "verCartas":
+				if cliente.Estado == ""{
+					servUtils.EnviarCartas(codificador, cliente.Cartas)
 				}
 			}
 		} else {
@@ -273,8 +289,10 @@ func pegarCarta(partida *servUtils.Partida, cliente *servUtils.Cliente, adversar
 		servUtils.EnviarAviso(codificadorAdiversario, "Seu adversário pegou uma carta")
 		if !adversario.ParouCartas {
 			partida.Turno = adversario.Cliente.Nome
+			servUtils.EnviarAviso(codificadorAdiversario, " É o seu turno!")
+		} else {
+			servUtils.EnviarAviso(codificador, " É o seu turno!")
 		}
-		servUtils.EnviarAviso(codificadorAdiversario, " É o seu turno!")
 	} else{
 		servUtils.EnviarAviso(codificador, "Não há mais cartas")
 		finalizarPartida(partida, cliente, adversario, &codificador, &codificadorAdiversario)
@@ -317,4 +335,16 @@ func fecharPartida(partida *servUtils.Partida) {
 		jogador.Cliente.JogoID = ""
 		jogador.Cliente.Estado = ""
 	}
+}
+
+func addCartaCliente(valor string, naipe string, cliente *servUtils.Cliente){
+    if cliente.Cartas == nil {
+        cliente.Cartas = make(map[string]map[string]int)
+    }
+
+    if cliente.Cartas[valor] == nil {
+        cliente.Cartas[valor] = make(map[string]int)
+    }
+
+    cliente.Cartas[valor][naipe]++
 }

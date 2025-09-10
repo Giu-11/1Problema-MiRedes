@@ -43,3 +43,12 @@ type FimPartida struct{
 	//ou
 	//maos map[string]([]string)
 }
+
+type CartaNova struct{
+	Valor string
+	Naipe string
+}
+
+type TodasCartas struct{
+	Cartas map[string]map[string]int
+}

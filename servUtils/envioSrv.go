@@ -13,6 +13,7 @@ type Cliente struct {
 	JogoID  string
 	Estado  string
 	Jogador *Jogador
+	Cartas map[string]map[string]int
 }
 
 type Jogador struct {
@@ -119,6 +120,38 @@ func EnviarInicioPartida(codificador json.Encoder, oponente string, primeiroJoga
 	respostaLogin := protocolo.InicioPartida{Oponente: oponente, PrimeiroJogar: primeiroJogar}
 
 	dadosCod, err := json.Marshal(respostaLogin)
+	if err == nil {
+		resposta.Dados = dadosCod
+		err := codificador.Encode(resposta)
+		if err != nil {
+			fmt.Println("Erro no envio de dados")
+		}
+	} else {
+		fmt.Println("Erro de codificação de dados")
+	}
+}
+
+func EnviarNovaCarta(codificador *json.Encoder, valor string, naipe string){
+	resposta := protocolo.Envelope{Requisicao: "novaCarta"}
+	dadosCarta := protocolo.CartaNova{Valor: valor, Naipe: naipe}
+
+	dadosCod, err := json.Marshal(dadosCarta)
+	if err == nil {
+		resposta.Dados = dadosCod
+		err := codificador.Encode(resposta)
+		if err != nil {
+			fmt.Println("Erro no envio de dados")
+		}
+	} else {
+		fmt.Println("Erro de codificação de dados")
+	}
+}
+
+func EnviarCartas(codificador *json.Encoder, cartas map[string]map[string]int){
+	resposta := protocolo.Envelope{Requisicao: "todasCartas"}
+	dadosCarta := protocolo.TodasCartas{Cartas: cartas}
+
+	dadosCod, err := json.Marshal(dadosCarta)
 	if err == nil {
 		resposta.Dados = dadosCod
 		err := codificador.Encode(resposta)

@@ -13,6 +13,7 @@ import (
 	"time"
 )
 
+//TODO: atualizar testes paraqualquermudançado servidor
 func TestMatchmakingConcorrente(t *testing.T) {
 	const numClientes = 1200
 	const addr = "localhost:8080"

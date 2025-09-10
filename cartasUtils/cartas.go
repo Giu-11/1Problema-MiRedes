@@ -2,7 +2,18 @@ package cartasUtils
 
 import (
 	"math/rand"
+	"sync"
 )
+
+type Carta struct{
+	Naipe string
+	Tipo string
+	Quantidade int
+}
+
+var tipos = []string{"A", "K", "Q", "J","10", "9", "8", "7","6", "5", "4", "3", "2",}
+var estoqueCartas = make(map[string]map[string]int)
+var cartasMutex = &sync.Mutex{}
 
 var pontuacoes = map[string]int{
 	"K":  10,
@@ -31,4 +42,45 @@ func GeradorCartasEmbaralhadas() []string {
 	})
 
 	return cartas
+}
+
+func CriadorEstoque(){
+	cartasMutex.Lock()
+	defer cartasMutex.Unlock()
+	naipes := []string{"♥️", "♠️", "♦️", "♣️"}
+	quantidades := []int{10, 20, 30, 40}
+	for carta := range pontuacoes{
+		estoqueCartas[carta] = make(map[string]int)
+		for i := 0; i < 4; i++{
+			estoqueCartas[carta][naipes[i]] = quantidades[i]
+		}
+	}
+}
+
+func AbrirPacote()(string, string){
+	cartasMutex.Lock()
+	defer cartasMutex.Unlock()
+	 total := 0
+    for _, naipes := range estoqueCartas {
+        for _, qtd := range naipes {
+            total += qtd
+        }
+    }
+    if total == 0 {
+        return "", ""
+    }
+
+    r := rand.Intn(total)
+
+    acumulado := 0
+    for valor, naipes := range estoqueCartas {
+        for naipe, qtd := range naipes {
+            acumulado += qtd
+            if r < acumulado {
+                estoqueCartas[valor][naipe]-- 
+                return valor, naipe
+            }
+        }
+    }
+    return "", ""
 }
