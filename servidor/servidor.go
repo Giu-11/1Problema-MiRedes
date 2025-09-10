@@ -29,7 +29,7 @@ func main() {
 	fmt.Println("Servidor iniciado, aguardando conexões na porta 8080...")
 	ouvinte, err := net.Listen("tcp", ":8080")
 	if err != nil {
-		msg:=fmt.Sprintf("Erro ao iniciar o servidor:%s\n",err)
+		msg := fmt.Sprintf("Erro ao iniciar o servidor:%s\n", err)
 		estilo.PrintVerm(msg)
 		return
 	}
@@ -39,7 +39,7 @@ func main() {
 
 		conexao, err := ouvinte.Accept()
 		if err != nil {
-			msg:=fmt.Sprintf("Erro ao aceitar conexão:%s\n",err)
+			msg := fmt.Sprintf("Erro ao aceitar conexão:%s\n", err)
 			estilo.PrintVerm(msg)
 			continue
 		}
@@ -48,7 +48,7 @@ func main() {
 }
 
 func lidarComConexao(conexao net.Conn) {
-	msg:=fmt.Sprintf("Novo cliente conectado:%s\n", conexao.RemoteAddr().String())
+	msg := fmt.Sprintf("Novo cliente conectado:%s\n", conexao.RemoteAddr().String())
 	estilo.PrintVerd(msg)
 	decodificador := json.NewDecoder(conexao)
 	codificador := json.NewEncoder(conexao)
@@ -84,7 +84,7 @@ func lidarComConexao(conexao net.Conn) {
 			case "abrirPacote":
 				if cliente.Estado == "" {
 					valor, naipe := cartasUtils.AbrirPacote()
-					if valor != "" && naipe != ""{
+					if valor != "" && naipe != "" {
 						addCartaCliente(valor, naipe, cliente)
 						servUtils.EnviarNovaCarta(codificador, valor, naipe)
 					} else {
@@ -92,8 +92,17 @@ func lidarComConexao(conexao net.Conn) {
 					}
 				}
 			case "verCartas":
-				if cliente.Estado == ""{
+				if cliente.Estado == "" {
 					servUtils.EnviarCartas(codificador, cliente.Cartas)
+				}
+
+			case "ping":
+				if cliente.Estado == "" {
+					resposta := protocolo.Envelope{Requisicao: "ping"}
+					err := codificador.Encode(resposta)
+					if err != nil {
+						fmt.Println("Erro no envio de dados")
+					}
 				}
 			}
 		} else {
@@ -103,7 +112,7 @@ func lidarComConexao(conexao net.Conn) {
 	}
 }
 
-func login(cliente *servUtils.Cliente, envelope *protocolo.Envelope, codificador *json.Encoder){
+func login(cliente *servUtils.Cliente, envelope *protocolo.Envelope, codificador *json.Encoder) {
 	if cliente.Estado == "login" {
 		var dadosLogin protocolo.Login
 		err := json.Unmarshal(envelope.Dados, &dadosLogin)
@@ -127,12 +136,12 @@ func tentarLogin(dadosLogin protocolo.Login) bool {
 		clientesMutex.Lock()
 		defer clientesMutex.Unlock()
 		_, existe := clientes[dadosLogin.Nome]
-		if !existe{
+		if !existe {
 			return true
 		}
 	}
 	return false
-	
+
 }
 
 func addListaClientes(cliente *servUtils.Cliente) {
@@ -246,7 +255,7 @@ func desconectarCliente(cliente *servUtils.Cliente) {
 	clientesMutex.Unlock()
 
 	cliente.Conexao.Close()
-	msg:=fmt.Sprintf("Cliente desconectado: %s\n", cliente.Nome)
+	msg := fmt.Sprintf("Cliente desconectado: %s\n", cliente.Nome)
 	estilo.PrintVerm(msg)
 
 }
@@ -271,14 +280,14 @@ func lidarComJogada(cliente *servUtils.Cliente, jogada protocolo.Jogada, codific
 			case "pararCartas":
 				pararCartas(cliente, adversario, partida, &codificador, codificadorAdiversario)
 			}
-		} else{
+		} else {
 			servUtils.EnviarAviso(codificador, "❌ Não é o seu turno! ❌")
 		}
 	}
 }
 
-func pegarCarta(partida *servUtils.Partida, cliente *servUtils.Cliente, adversario *servUtils.Jogador, codificador json.Encoder, codificadorAdiversario json.Encoder){
-	if len(partida.Cartas) > 0{
+func pegarCarta(partida *servUtils.Partida, cliente *servUtils.Cliente, adversario *servUtils.Jogador, codificador json.Encoder, codificadorAdiversario json.Encoder) {
+	if len(partida.Cartas) > 0 {
 		carta := partida.Cartas[0]
 		partida.Cartas = partida.Cartas[1:]
 		cliente.Jogador.Mao = append(cliente.Jogador.Mao, carta)
@@ -293,25 +302,25 @@ func pegarCarta(partida *servUtils.Partida, cliente *servUtils.Cliente, adversar
 		} else {
 			servUtils.EnviarAviso(codificador, " É o seu turno!")
 		}
-	} else{
+	} else {
 		servUtils.EnviarAviso(codificador, "Não há mais cartas")
 		finalizarPartida(partida, cliente, adversario, &codificador, &codificadorAdiversario)
 	}
 }
 
-func pararCartas(cliente *servUtils.Cliente, adversario *servUtils.Jogador, partida *servUtils.Partida, codificador *json.Encoder, codificadorAdiversario *json.Encoder){
+func pararCartas(cliente *servUtils.Cliente, adversario *servUtils.Jogador, partida *servUtils.Partida, codificador *json.Encoder, codificadorAdiversario *json.Encoder) {
 	cliente.Jogador.ParouCartas = true
-				servUtils.EnviarAviso(*codificador, "Você parou de pegar cartas")
-				if adversario.ParouCartas {
-					finalizarPartida(partida, cliente, adversario, codificador, codificadorAdiversario)
-				} else {
-					servUtils.EnviarAviso(*codificadorAdiversario, " É o seu turno!")
-					servUtils.EnviarAviso(*codificadorAdiversario, "Seu adversário parou de pegar cartas")
-					partida.Turno = adversario.Cliente.Nome
-				}
+	servUtils.EnviarAviso(*codificador, "Você parou de pegar cartas")
+	if adversario.ParouCartas {
+		finalizarPartida(partida, cliente, adversario, codificador, codificadorAdiversario)
+	} else {
+		servUtils.EnviarAviso(*codificadorAdiversario, " É o seu turno!")
+		servUtils.EnviarAviso(*codificadorAdiversario, "Seu adversário parou de pegar cartas")
+		partida.Turno = adversario.Cliente.Nome
+	}
 }
 
-func finalizarPartida(partida *servUtils.Partida, cliente *servUtils.Cliente, adversario *servUtils.Jogador, codificador *json.Encoder, codificadorAdiversario *json.Encoder){
+func finalizarPartida(partida *servUtils.Partida, cliente *servUtils.Cliente, adversario *servUtils.Jogador, codificador *json.Encoder, codificadorAdiversario *json.Encoder) {
 	pontosFinais := map[string]int{
 		cliente.Nome:            cliente.Jogador.Pontos,
 		adversario.Cliente.Nome: adversario.Pontos,
@@ -337,14 +346,14 @@ func fecharPartida(partida *servUtils.Partida) {
 	}
 }
 
-func addCartaCliente(valor string, naipe string, cliente *servUtils.Cliente){
-    if cliente.Cartas == nil {
-        cliente.Cartas = make(map[string]map[string]int)
-    }
+func addCartaCliente(valor string, naipe string, cliente *servUtils.Cliente) {
+	if cliente.Cartas == nil {
+		cliente.Cartas = make(map[string]map[string]int)
+	}
 
-    if cliente.Cartas[valor] == nil {
-        cliente.Cartas[valor] = make(map[string]int)
-    }
+	if cliente.Cartas[valor] == nil {
+		cliente.Cartas[valor] = make(map[string]int)
+	}
 
-    cliente.Cartas[valor][naipe]++
+	cliente.Cartas[valor][naipe]++
 }

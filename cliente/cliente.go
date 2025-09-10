@@ -9,6 +9,7 @@ import (
 	"projeto-rede/estilo"
 	"projeto-rede/protocolo"
 	"strings"
+	"time"
 )
 
 var mensagensDoServidor = make(chan protocolo.Envelope)
@@ -32,6 +33,8 @@ func main() {
 	fmt.Println("\n--- Bem-vindo! ---")
 	fmt.Println("Digite seu nome de usuário para fazer o login:")
 	fmt.Print(">> ")
+
+	var startPing time.Time
 
 	sair := false
 	for !sair{
@@ -120,6 +123,15 @@ func main() {
 				mostraCartas(cartas.Cartas)
 				exibirMenu()
 				estadoCliente = "menu"
+			
+			case "ping":
+				if estadoCliente == "ping" {
+					estilo.Clear()
+					msg := fmt.Sprintf("🖥️Ping %s\n", time.Since(startPing))
+					estilo.PrintAma(msg)
+					estadoCliente = "menu"
+					exibirMenu()
+				}
 			}
 			fmt.Print(">> ")
 
@@ -142,9 +154,9 @@ func main() {
 					//fmt.Println("Ainda não é possivel abir pacotes 😿")
 				case "3":
 					estilo.Clear()
-					fmt.Println("Ainda não é possivel ver o PING 😿")
-					exibirMenu()
-					enviar = false
+					msgParaEnviar = protocolo.Envelope{Requisicao: "ping"}
+					startPing = time.Now()
+					estadoCliente = "ping"
 				case "4":
 					estilo.Clear()
 					verRegras()
