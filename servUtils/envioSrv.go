@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"net"
 	"projeto-rede/protocolo"
+	"sync"
 )
 
 type Cliente struct {
@@ -13,7 +14,8 @@ type Cliente struct {
 	JogoID  string
 	Estado  string
 	Jogador *Jogador
-	Cartas map[string]map[string]int
+	Cartas  map[string]map[string]int
+	Mutex   sync.Mutex
 }
 
 type Jogador struct {
@@ -131,7 +133,7 @@ func EnviarInicioPartida(codificador json.Encoder, oponente string, primeiroJoga
 	}
 }
 
-func EnviarNovaCarta(codificador *json.Encoder, valor string, naipe string){
+func EnviarNovaCarta(codificador *json.Encoder, valor string, naipe string) {
 	resposta := protocolo.Envelope{Requisicao: "novaCarta"}
 	dadosCarta := protocolo.CartaNova{Valor: valor, Naipe: naipe}
 
@@ -147,7 +149,7 @@ func EnviarNovaCarta(codificador *json.Encoder, valor string, naipe string){
 	}
 }
 
-func EnviarCartas(codificador *json.Encoder, cartas map[string]map[string]int){
+func EnviarCartas(codificador *json.Encoder, cartas map[string]map[string]int) {
 	resposta := protocolo.Envelope{Requisicao: "todasCartas"}
 	dadosCarta := protocolo.TodasCartas{Cartas: cartas}
 

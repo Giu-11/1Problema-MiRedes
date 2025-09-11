@@ -5,13 +5,13 @@ import (
 	"sync"
 )
 
-type Carta struct{
-	Naipe string
-	Tipo string
+type Carta struct {
+	Naipe      string
+	Tipo       string
 	Quantidade int
 }
 
-var tipos = []string{"A", "K", "Q", "J","10", "9", "8", "7","6", "5", "4", "3", "2",}
+var totalCartas int
 var estoqueCartas = make(map[string]map[string]int)
 var cartasMutex = &sync.Mutex{}
 
@@ -44,43 +44,50 @@ func GeradorCartasEmbaralhadas() []string {
 	return cartas
 }
 
-func CriadorEstoque(){
+func CriadorEstoque() {
 	cartasMutex.Lock()
 	defer cartasMutex.Unlock()
-	naipes := []string{"♥️", "♠️", "♦️", "♣️"}
-	quantidades := []int{10, 20, 30, 40}
-	for carta := range pontuacoes{
-		estoqueCartas[carta] = make(map[string]int)
-		for i := 0; i < 4; i++{
-			estoqueCartas[carta][naipes[i]] = quantidades[i]
+
+	estoqueCartas = make(map[string]map[string]int)
+	valores := []string{"A", "K", "Q", "J", "10", "9", "8", "7", "6", "5", "4", "3", "2"}
+	quantidadesPorNaipe := map[string]int{
+		"♥️": 10,
+		"♠️": 20,
+		"♦️": 30,
+		"♣️": 40,
+	}
+
+	for _, valor := range valores {
+		estoqueCartas[valor] = make(map[string]int)
+		for naipe, quantidade := range quantidadesPorNaipe {
+			estoqueCartas[valor][naipe] = quantidade
+			totalCartas += quantidade
 		}
 	}
 }
 
-func AbrirPacote()(string, string){
+func AbrirPacote() (string, string) {
 	cartasMutex.Lock()
 	defer cartasMutex.Unlock()
-	 total := 0
-    for _, naipes := range estoqueCartas {
-        for _, qtd := range naipes {
-            total += qtd
-        }
-    }
-    if total == 0 {
-        return "", ""
-    }
 
-    r := rand.Intn(total)
+	if totalCartas == 0 {
+		return "", ""
+	}
 
-    acumulado := 0
-    for valor, naipes := range estoqueCartas {
-        for naipe, qtd := range naipes {
-            acumulado += qtd
-            if r < acumulado {
-                estoqueCartas[valor][naipe]-- 
-                return valor, naipe
-            }
-        }
-    }
-    return "", ""
+	r := rand.Intn(totalCartas)
+
+	acumulado := 0
+	for valor, naipes := range estoqueCartas {
+		for naipe, qtd := range naipes {
+			if qtd > 0 { 
+				acumulado += qtd
+				if r < acumulado {
+					estoqueCartas[valor][naipe]-- 
+					totalCartas--     
+					return valor, naipe
+				}
+			}
+		}
+	}
+	return "", ""
 }

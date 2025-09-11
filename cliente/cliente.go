@@ -37,26 +37,26 @@ func main() {
 	var startPing time.Time
 
 	sair := false
-	for !sair{
+	for !sair {
 		select {
 		case msgServidor := <-mensagensDoServidor:
 			switch msgServidor.Requisicao {
 			case "confirmacao":
 				var conf protocolo.Confirmacao
 				json.Unmarshal(msgServidor.Dados, &conf)
-				switch conf.Assunto{
+				switch conf.Assunto {
 				case "login":
-					if conf.Resultado{
+					if conf.Resultado {
 						estilo.Clear()
 						estilo.PrintVerd("\n✅ Login realizado com sucesso!\n")
 						estadoCliente = "menu"
 						exibirMenu()
-					}else{
+					} else {
 						estilo.PrintVerm("\n⚠️ Falha no login. Tente outro nome.\n")
 						estadoCliente = "login"
 					}
 				case "pacote":
-					if !conf.Resultado{
+					if !conf.Resultado {
 						estilo.PrintVerm("Não há mais pacotes!❌")
 					}
 				}
@@ -86,13 +86,13 @@ func main() {
 				estilo.Clear()
 				var dadosPartida protocolo.FimPartida
 				json.Unmarshal(msgServidor.Dados, &dadosPartida)
-				for nome, pontos := range dadosPartida.Pontos{
+				for nome, pontos := range dadosPartida.Pontos {
 					fmt.Printf("%s conseguiu %d pontos\n", nome, pontos)
 				}
-				if dadosPartida.Ganhador != "empate"{
+				if dadosPartida.Ganhador != "empate" {
 					msg := fmt.Sprintf("%s GANHOU🎉!\n", dadosPartida.Ganhador)
 					estilo.PrintVerd(msg)
-				} else{
+				} else {
 					fmt.Println("EMPATE")
 				}
 				estadoCliente = "menu"
@@ -101,7 +101,7 @@ func main() {
 			case "saiuPartida":
 				estilo.Clear()
 				var mensagem protocolo.Mensagem
-				json.Unmarshal(msgServidor.Dados, &mensagem) 
+				json.Unmarshal(msgServidor.Dados, &mensagem)
 				msg := fmt.Sprintf("\n--- ⚠️%s⚠️ ---\n", mensagem.Mensagem)
 				estilo.PrintVerm(msg)
 				estadoCliente = "menu"
@@ -123,7 +123,7 @@ func main() {
 				mostraCartas(cartas.Cartas)
 				exibirMenu()
 				estadoCliente = "menu"
-			
+
 			case "ping":
 				if estadoCliente == "ping" {
 					estilo.Clear()
@@ -179,10 +179,10 @@ func main() {
 			case "jogando":
 				switch input {
 				case "1":
-					dados,_:= json.Marshal(protocolo.Jogada{Acao: "pegarCarta"})
+					dados, _ := json.Marshal(protocolo.Jogada{Acao: "pegarCarta"})
 					msgParaEnviar = protocolo.Envelope{Requisicao: "jogada", Dados: dados}
 				case "2":
-					dados,_:= json.Marshal(protocolo.Jogada{Acao: "pararCartas"})
+					dados, _ := json.Marshal(protocolo.Jogada{Acao: "pararCartas"})
 					msgParaEnviar = protocolo.Envelope{Requisicao: "jogada", Dados: dados}
 				default:
 					estilo.PrintVerm("❌Opção inválida.\n")
@@ -222,16 +222,15 @@ func lerInputDoUsuario() {
 	}
 }
 
-func mostraCartas(cartas map[string]map[string]int){
-	for valor, naipes := range cartas{
+func mostraCartas(cartas map[string]map[string]int) {
+	for valor, naipes := range cartas {
 		fmt.Printf("\n")
-		for naipe, quantidade := range naipes{
+		for naipe, quantidade := range naipes {
 			fmt.Printf("%s%s x%d\t\t", valor, naipe, quantidade)
 		}
 	}
 	fmt.Printf("\n")
 }
-
 
 func exibirMenu() {
 	fmt.Println("\n--- MENU ---")
@@ -245,13 +244,13 @@ func exibirMenu() {
 
 }
 
-func exibirMenuPartida(){
+func exibirMenuPartida() {
 	fmt.Println("\n\tSELECIONE SUA JOGADA!")
 	fmt.Println("1-Pegar Carta")
 	fmt.Println("2-Parar de pegar cartas")
 }
 
-func verRegras(){
+func verRegras() {
 	fmt.Println("\nEsse jogo é uma versão simplificada de 21")
 	fmt.Println("Seu objetivo é conseguir o mais perto possivel de 21 pontos")
 	fmt.Println("As cartas valem:")

@@ -36,7 +36,6 @@ func main() {
 	defer ouvinte.Close()
 
 	for {
-
 		conexao, err := ouvinte.Accept()
 		if err != nil {
 			msg := fmt.Sprintf("Erro ao aceitar conexão:%s\n", err)
@@ -61,62 +60,75 @@ func lidarComConexao(conexao net.Conn) {
 	for !sair {
 		var envelope protocolo.Envelope
 		err := decodificador.Decode(&envelope)
-		if err == nil {
-			switch envelope.Requisicao {
-			case "login":
-				login(cliente, &envelope, codificador)
-			case "procurar":
-				if cliente.Estado == "" {
-					cliente.Estado = "esperando"
-					addFilaEspera(cliente)
-					//TODO: função de sair da fila de espera
-				} else {
-					servUtils.EnviarAviso(*codificador, "Ação inválida")
-				}
-			case "jogada":
-				if cliente.Estado == "jogando" {
-					var jogada protocolo.Jogada
-					err := json.Unmarshal(envelope.Dados, &jogada)
-					if err == nil {
-						lidarComJogada(cliente, jogada, *codificador)
-					}
-				}
-			case "abrirPacote":
-				if cliente.Estado == "" {
-					valor, naipe := cartasUtils.AbrirPacote()
-					if valor != "" && naipe != "" {
-						addCartaCliente(valor, naipe, cliente)
-						servUtils.EnviarNovaCarta(codificador, valor, naipe)
-					} else {
-						servUtils.EnviarResposta(*codificador, "confirmacao", "pacote", false)
-					}
-				}
-			case "verCartas":
-				if cliente.Estado == "" {
-					servUtils.EnviarCartas(codificador, cliente.Cartas)
-				}
+		if err != nil {
+			cliente.Mutex.Lock()
+			nomeCliente := cliente.Nome
+			cliente.Mutex.Unlock()
+			if nomeCliente == "" {
+				nomeCliente = "não logado"
+			}
+			fmt.Printf("Cliente %s perdeu a conexão. Erro: %v\n", nomeCliente, err)
+			sair = true
+			continue
+		}
 
-			case "ping":
-				if cliente.Estado == "" {
-					resposta := protocolo.Envelope{Requisicao: "ping"}
-					err := codificador.Encode(resposta)
-					if err != nil {
-						fmt.Println("Erro no envio de dados")
-					}
+		switch envelope.Requisicao {
+		case "login":
+			login(cliente, &envelope, codificador)
+
+		case "procurar":
+			cliente.Mutex.Lock()
+			if cliente.Estado == "" {
+				cliente.Estado = "esperando"
+				cliente.Mutex.Unlock()
+				addFilaEspera(cliente)
+			} else {
+				cliente.Mutex.Unlock()
+				servUtils.EnviarAviso(*codificador, "Ação inválida")
+			}
+
+		case "jogada":
+			cliente.Mutex.Lock()
+			estado := cliente.Estado
+			cliente.Mutex.Unlock()
+			if estado == "jogando" {
+				var jogada protocolo.Jogada
+				if err := json.Unmarshal(envelope.Dados, &jogada); err == nil {
+					lidarComJogada(cliente, jogada, *codificador)
 				}
 			}
-		} else {
-			fmt.Printf("Cliente %s perdeu a conexão. Erro: %v\n", cliente.Nome, err)
-			sair = true
+
+		case "abrirPacote":
+			cliente.Mutex.Lock()
+			estado := cliente.Estado
+			cliente.Mutex.Unlock()
+
+			if estado == "" {
+				valor, naipe := cartasUtils.AbrirPacote()
+				if valor != "" && naipe != "" {
+					addCartaCliente(valor, naipe, cliente)
+					servUtils.EnviarNovaCarta(codificador, valor, naipe)
+				} else {
+					servUtils.EnviarResposta(*codificador, "confirmacao", "pacote", false)
+				}
+			}
+
+		case "verCartas":
+			cliente.Mutex.Lock()
+			cartas := cliente.Cartas
+			cliente.Mutex.Unlock()
+			servUtils.EnviarCartas(codificador, cartas)
 		}
 	}
 }
 
 func login(cliente *servUtils.Cliente, envelope *protocolo.Envelope, codificador *json.Encoder) {
+	cliente.Mutex.Lock()
+	defer cliente.Mutex.Unlock()
+
 	if cliente.Estado == "login" {
 		var dadosLogin protocolo.Login
-		err := json.Unmarshal(envelope.Dados, &dadosLogin)
-		if err == nil {
+		if err := json.Unmarshal(envelope.Dados, &dadosLogin); err == nil {
 			if tentarLogin(dadosLogin) {
 				cliente.Nome = dadosLogin.Nome
 				cliente.Estado = ""
@@ -136,25 +148,22 @@ func tentarLogin(dadosLogin protocolo.Login) bool {
 		clientesMutex.Lock()
 		defer clientesMutex.Unlock()
 		_, existe := clientes[dadosLogin.Nome]
-		if !existe {
-			return true
-		}
+		return !existe
 	}
 	return false
-
 }
 
 func addListaClientes(cliente *servUtils.Cliente) {
 	clientesMutex.Lock()
+	defer clientesMutex.Unlock()
 	clientes[cliente.Nome] = cliente
-	clientesMutex.Unlock()
 }
 
 func addFilaEspera(cliente *servUtils.Cliente) {
-	cliente.Estado = "esperando"
 	esperaMutex.Lock()
 	filaEspera = append(filaEspera, cliente)
 	esperaMutex.Unlock()
+
 	codificador := json.NewEncoder(cliente.Conexao)
 	servUtils.EnviarAviso(*codificador, "Buscando adversário, aguarde...")
 	fmt.Printf("Jogador %s entrou na fila de espera\n", cliente.Nome)
@@ -163,122 +172,136 @@ func addFilaEspera(cliente *servUtils.Cliente) {
 
 func verificarEspera() {
 	esperaMutex.Lock()
-	defer esperaMutex.Unlock()
-
-	if len(filaEspera) >= 2 {
-		Cliente1 := filaEspera[0]
-		Cliente2 := filaEspera[1]
-
-		codificador1 := json.NewEncoder(Cliente1.Conexao)
-		codificador2 := json.NewEncoder(Cliente2.Conexao)
-
-		jogador1 := &servUtils.Jogador{Cliente: Cliente1, Mao: make([]string, 0), Pontos: 0, ParouCartas: false}
-		jogador2 := &servUtils.Jogador{Cliente: Cliente2, Mao: make([]string, 0), Pontos: 0, ParouCartas: false}
-		Cliente1.Jogador = jogador1
-		Cliente2.Jogador = jogador2
-
-		filaEspera = filaEspera[2:]
-		msg := fmt.Sprintf("INICIANDO PARTIDA: %s x %s\n", Cliente1.Nome, Cliente2.Nome)
-		estilo.PrintCian(msg)
-		jogoID := "jogo:" + strconv.FormatInt(time.Now().UnixNano(), 10)
-
-		partidasMutex.Lock()
-		partida := &servUtils.Partida{ID: jogoID, Jogadores: make(map[string]*servUtils.Jogador)}
-		primeiroJogador := rand.Intn(2)
-		switch primeiroJogador {
-		case 0:
-			partida.Turno = Cliente1.Nome
-		case 1:
-			partida.Turno = Cliente2.Nome
-		}
-		clientesMutex.Lock()
-		partidas[jogoID] = partida
-		partida.Jogadores[Cliente1.Nome] = jogador1
-		partida.Jogadores[Cliente2.Nome] = jogador2
-		Cliente1.Estado = "jogando"
-		Cliente2.Estado = "jogando"
-		Cliente1.JogoID = jogoID
-		Cliente2.JogoID = jogoID
-		clientesMutex.Unlock()
-		partida.Cartas = cartasUtils.GeradorCartasEmbaralhadas()
-		partidasMutex.Unlock()
-
-		servUtils.EnviarInicioPartida(*codificador1, Cliente2.Nome, partida.Turno)
-		servUtils.EnviarInicioPartida(*codificador2, Cliente1.Nome, partida.Turno)
-
-		switch primeiroJogador {
-		case 0:
-			servUtils.EnviarAviso(*codificador1, "Você é o primeiro a jogar!")
-			servUtils.EnviarAviso(*codificador2, "Você é o segundo a jogar!")
-		case 1:
-			servUtils.EnviarAviso(*codificador2, "Você é o primeiro a jogar!")
-			servUtils.EnviarAviso(*codificador1, "Você é o segundo a jogar!")
-		}
+	if len(filaEspera) < 2 {
+		esperaMutex.Unlock()
+		return
 	}
+
+	cliente1 := filaEspera[0]
+	cliente2 := filaEspera[1]
+	filaEspera = filaEspera[2:]
+	esperaMutex.Unlock()
+
+	cliente1.Mutex.Lock()
+	defer cliente1.Mutex.Unlock()
+	cliente2.Mutex.Lock()
+	defer cliente2.Mutex.Unlock()
+
+	partidasMutex.Lock()
+	defer partidasMutex.Unlock()
+
+	jogoID := "jogo:" + strconv.FormatInt(time.Now().UnixNano(), 10)
+	partida := &servUtils.Partida{ID: jogoID, Jogadores: make(map[string]*servUtils.Jogador)}
+
+	jogador1 := &servUtils.Jogador{Cliente: cliente1}
+	jogador2 := &servUtils.Jogador{Cliente: cliente2}
+
+	cliente1.Jogador = jogador1
+	cliente2.Jogador = jogador2
+	cliente1.Estado = "jogando"
+	cliente2.Estado = "jogando"
+	cliente1.JogoID = jogoID
+	cliente2.JogoID = jogoID
+
+	partidas[jogoID] = partida
+	partida.Jogadores[cliente1.Nome] = jogador1
+	partida.Jogadores[cliente2.Nome] = jogador2
+	partida.Cartas = cartasUtils.GeradorCartasEmbaralhadas()
+
+	if rand.Intn(2) == 0 {
+		partida.Turno = cliente1.Nome
+	} else {
+		partida.Turno = cliente2.Nome
+	}
+
+	msg := fmt.Sprintf("INICIANDO PARTIDA: %s x %s\n", cliente1.Nome, cliente2.Nome)
+	estilo.PrintCian(msg)
+
+	codificador1 := json.NewEncoder(cliente1.Conexao)
+	codificador2 := json.NewEncoder(cliente2.Conexao)
+	servUtils.EnviarInicioPartida(*codificador1, cliente2.Nome, partida.Turno)
+	servUtils.EnviarInicioPartida(*codificador2, cliente1.Nome, partida.Turno)
 }
 
 func desconectarCliente(cliente *servUtils.Cliente) {
+	cliente.Mutex.Lock()
+	nomeCliente := cliente.Nome
+	jogoID := cliente.JogoID
+	cliente.Mutex.Unlock()
+
+	// Remove da fila de espera
 	esperaMutex.Lock()
 	novaFila := []*servUtils.Cliente{}
 	for _, c := range filaEspera {
-		if c.Nome != cliente.Nome {
+		if c != cliente {
 			novaFila = append(novaFila, c)
 		}
 	}
 	filaEspera = novaFila
 	esperaMutex.Unlock()
 
-	if cliente.JogoID != "" {
+	// Se estava em jogo, notifica o oponente e limpa a partida
+	if jogoID != "" {
+		var oponente *servUtils.Cliente
+
 		partidasMutex.Lock()
-		partida, ok := partidas[cliente.JogoID]
+		partida, ok := partidas[jogoID]
 		if ok {
 			for _, jogador := range partida.Jogadores {
-				if jogador.Cliente.Nome != cliente.Nome {
-					codificadorAdversario := json.NewEncoder(jogador.Cliente.Conexao)
-					mensagem := fmt.Sprintf("%s saiu do jogo, a partida acabou", cliente.Nome)
-					servUtils.EnviarSauiPartida(*codificadorAdversario, mensagem)
-					jogador.Cliente.Jogador = nil
-					jogador.Cliente.JogoID = ""
-					jogador.Cliente.Estado = ""
+				if jogador.Cliente.Nome != nomeCliente {
+					oponente = jogador.Cliente
 				}
 			}
-			delete(partidas, cliente.JogoID)
-			cliente.JogoID = ""
-			cliente.Estado = ""
+			delete(partidas, jogoID)
 		}
 		partidasMutex.Unlock()
 
+		if oponente != nil {
+			oponente.Mutex.Lock()
+			codificadorAdversario := json.NewEncoder(oponente.Conexao)
+			mensagem := fmt.Sprintf("%s saiu do jogo, a partida acabou", nomeCliente)
+			servUtils.EnviarSauiPartida(*codificadorAdversario, mensagem)
+			oponente.Jogador = nil
+			oponente.JogoID = ""
+			oponente.Estado = ""
+			oponente.Mutex.Unlock()
+		}
 	}
 
-	clientesMutex.Lock()
-	delete(clientes, cliente.Nome)
-	clientesMutex.Unlock()
+	// Remove da lista global de clientes
+	if nomeCliente != "" && nomeCliente != "none" {
+		clientesMutex.Lock()
+		delete(clientes, nomeCliente)
+		clientesMutex.Unlock()
+	}
 
 	cliente.Conexao.Close()
-	msg := fmt.Sprintf("Cliente desconectado: %s\n", cliente.Nome)
+	msg := fmt.Sprintf("Cliente desconectado: %s\n", nomeCliente)
 	estilo.PrintVerm(msg)
-
 }
 
 func lidarComJogada(cliente *servUtils.Cliente, jogada protocolo.Jogada, codificador json.Encoder) {
 	partidasMutex.Lock()
 	partida, ok := partidas[cliente.JogoID]
-	defer partidasMutex.Unlock()
+	partidasMutex.Unlock()
+
 	if ok {
+		partidasMutex.Lock()
+		turnoAtual := partida.Turno
 		var adversario *servUtils.Jogador
-		var codificadorAdiversario *json.Encoder
 		for _, jogador := range partida.Jogadores {
 			if jogador.Cliente.Nome != cliente.Nome {
 				adversario = jogador
-				codificadorAdiversario = json.NewEncoder(adversario.Cliente.Conexao)
 			}
 		}
-		if partida.Turno == cliente.Nome {
+		partidasMutex.Unlock()
+
+		if turnoAtual == cliente.Nome {
 			switch jogada.Acao {
 			case "pegarCarta":
-				pegarCarta(partida, cliente, adversario, codificador, *codificadorAdiversario)
+				pegarCarta(partida, cliente, adversario, codificador, *json.NewEncoder(adversario.Cliente.Conexao))
 			case "pararCartas":
-				pararCartas(cliente, adversario, partida, &codificador, codificadorAdiversario)
+				pararCartas(cliente, adversario, partida, &codificador, json.NewEncoder(adversario.Cliente.Conexao))
 			}
 		} else {
 			servUtils.EnviarAviso(codificador, "❌ Não é o seu turno! ❌")
@@ -287,21 +310,24 @@ func lidarComJogada(cliente *servUtils.Cliente, jogada protocolo.Jogada, codific
 }
 
 func pegarCarta(partida *servUtils.Partida, cliente *servUtils.Cliente, adversario *servUtils.Jogador, codificador json.Encoder, codificadorAdiversario json.Encoder) {
+	partidasMutex.Lock()
+	defer partidasMutex.Unlock()
+
 	if len(partida.Cartas) > 0 {
 		carta := partida.Cartas[0]
 		partida.Cartas = partida.Cartas[1:]
 		cliente.Jogador.Mao = append(cliente.Jogador.Mao, carta)
 		pontos := cartasUtils.TradutorPontos(carta)
 		cliente.Jogador.Pontos += pontos
-		servUtils.EnviarResJogada(codificador, carta, pontos, cliente)
 
-		servUtils.EnviarAviso(codificadorAdiversario, "Seu adversário pegou uma carta")
 		if !adversario.ParouCartas {
 			partida.Turno = adversario.Cliente.Nome
-			servUtils.EnviarAviso(codificadorAdiversario, " É o seu turno!")
-		} else {
-			servUtils.EnviarAviso(codificador, " É o seu turno!")
 		}
+
+		servUtils.EnviarResJogada(codificador, carta, pontos, cliente)
+		servUtils.EnviarAviso(codificadorAdiversario, "Seu adversário pegou uma carta")
+		servUtils.EnviarAviso(codificadorAdiversario, " É o seu turno!")
+
 	} else {
 		servUtils.EnviarAviso(codificador, "Não há mais cartas")
 		finalizarPartida(partida, cliente, adversario, &codificador, &codificadorAdiversario)
@@ -309,14 +335,18 @@ func pegarCarta(partida *servUtils.Partida, cliente *servUtils.Cliente, adversar
 }
 
 func pararCartas(cliente *servUtils.Cliente, adversario *servUtils.Jogador, partida *servUtils.Partida, codificador *json.Encoder, codificadorAdiversario *json.Encoder) {
+	partidasMutex.Lock()
+	defer partidasMutex.Unlock()
+
 	cliente.Jogador.ParouCartas = true
-	servUtils.EnviarAviso(*codificador, "Você parou de pegar cartas")
+
 	if adversario.ParouCartas {
 		finalizarPartida(partida, cliente, adversario, codificador, codificadorAdiversario)
 	} else {
+		partida.Turno = adversario.Cliente.Nome
+		servUtils.EnviarAviso(*codificador, "Você parou de pegar cartas")
 		servUtils.EnviarAviso(*codificadorAdiversario, " É o seu turno!")
 		servUtils.EnviarAviso(*codificadorAdiversario, "Seu adversário parou de pegar cartas")
-		partida.Turno = adversario.Cliente.Nome
 	}
 }
 
@@ -325,28 +355,33 @@ func finalizarPartida(partida *servUtils.Partida, cliente *servUtils.Cliente, ad
 		cliente.Nome:            cliente.Jogador.Pontos,
 		adversario.Cliente.Nome: adversario.Pontos,
 	}
+	vencedor := "empate"
 	dis21cliente := int(math.Abs(float64(cliente.Jogador.Pontos) - 21))
 	dis21adversario := int(math.Abs(float64(adversario.Pontos) - 21))
 	if dis21cliente < dis21adversario {
-		servUtils.EnviarFimPartida(codificador, codificadorAdiversario, cliente.Nome, pontosFinais)
+		vencedor = cliente.Nome
 	} else if dis21cliente > dis21adversario {
-		servUtils.EnviarFimPartida(codificador, codificadorAdiversario, adversario.Cliente.Nome, pontosFinais)
-	} else {
-		servUtils.EnviarFimPartida(codificador, codificadorAdiversario, "empate", pontosFinais)
+		vencedor = adversario.Cliente.Nome
 	}
+
+	servUtils.EnviarFimPartida(codificador, codificadorAdiversario, vencedor, pontosFinais)
 	fecharPartida(partida)
 }
 
 func fecharPartida(partida *servUtils.Partida) {
 	for _, jogador := range partida.Jogadores {
-		estilo.PrintMag("FIM DE PARTIDA\n")
+		jogador.Cliente.Mutex.Lock()
 		jogador.Cliente.Jogador = nil
 		jogador.Cliente.JogoID = ""
 		jogador.Cliente.Estado = ""
+		jogador.Cliente.Mutex.Unlock()
 	}
 }
 
 func addCartaCliente(valor string, naipe string, cliente *servUtils.Cliente) {
+	cliente.Mutex.Lock()
+	defer cliente.Mutex.Unlock()
+
 	if cliente.Cartas == nil {
 		cliente.Cartas = make(map[string]map[string]int)
 	}
