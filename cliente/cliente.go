@@ -8,12 +8,21 @@ import (
 	"os"
 	"projeto-rede/estilo"
 	"projeto-rede/protocolo"
+	"sort"
+	"strconv"
 	"strings"
 	"time"
 )
 
 var mensagensDoServidor = make(chan protocolo.Envelope)
 var inputDoUsuario = make(chan string)
+
+var inventarioCliente map[string]map[string]int
+
+var deckEscolhido = make(map[string]string)
+
+var valoresParaEscolher []string
+var valorAtualParaEscolha string
 
 func main() {
 	conexao, err := net.Dial("tcp", "localhost:8080")
@@ -80,7 +89,12 @@ func main() {
 			case "resJogada":
 				var resJogada protocolo.RespostaJogada
 				json.Unmarshal(msgServidor.Dados, &resJogada)
-				fmt.Printf("Você conseguiu um %s\n+%d pontos!\nTotal de pontos:%d\n", resJogada.Carta, resJogada.PontosCarta, resJogada.PontosTotal)
+				naipe := deckEscolhido[resJogada.Carta]
+				/*if naipe == "" { 
+					naipe = "🚫"
+				}*/
+				fmt.Printf("Você conseguiu um %s%s\n+%d pontos!\nTotal de pontos:%d\n", resJogada.Carta, naipe, resJogada.PontosCarta, resJogada.PontosTotal)
+
 
 			case "fimPartida":
 				estilo.Clear()
@@ -120,9 +134,22 @@ func main() {
 				estilo.Clear()
 				var cartas protocolo.TodasCartas
 				json.Unmarshal(msgServidor.Dados, &cartas)
-				mostraCartas(cartas.Cartas)
-				exibirMenu()
-				estadoCliente = "menu"
+				inventarioCliente = cartas.Cartas 
+				if estadoCliente == "preparandoDeck" {
+					iniciarMontagemDeck()
+					estadoCliente = "montandoDeck"
+					fimEscolha := proximaEscolhaDeDeck() 
+					if fimEscolha{
+						estadoCliente = "menu"
+						exibirMenu()
+						fmt.Print(">> ")
+					}
+
+				} else {
+					mostraCartas(inventarioCliente)
+					exibirMenu()
+					estadoCliente = "menu"
+				}
 
 			case "ping":
 				if estadoCliente == "ping" {
@@ -133,7 +160,10 @@ func main() {
 					exibirMenu()
 				}
 			}
-			fmt.Print(">> ")
+			if estadoCliente != "montandoDeck" {
+				fmt.Print(">> ")
+			}
+
 
 		case input := <-inputDoUsuario:
 			var msgParaEnviar protocolo.Envelope
@@ -145,37 +175,57 @@ func main() {
 				msgParaEnviar = protocolo.Envelope{Requisicao: "login", Dados: dados}
 			case "menu":
 				switch input {
-				case "1":
+				case "1": //entrar na fila de espera
 					msgParaEnviar = protocolo.Envelope{Requisicao: "procurar"}
 					estadoCliente = "esperando"
-				case "2":
+				case "2": //abrir pacote
 					estadoCliente = "abrindoPacote"
 					msgParaEnviar = protocolo.Envelope{Requisicao: "abrirPacote"}
-					//fmt.Println("Ainda não é possivel abir pacotes 😿")
-				case "3":
+				case "3": //ver ping
 					estilo.Clear()
 					msgParaEnviar = protocolo.Envelope{Requisicao: "ping"}
 					startPing = time.Now()
 					estadoCliente = "ping"
-				case "4":
+				case "4": //ver regras
 					estilo.Clear()
 					verRegras()
 					exibirMenu()
 					enviar = false
-				case "5":
+				case "5": // Ver todas cartas
 					msgParaEnviar = protocolo.Envelope{Requisicao: "verCartas"}
-					estadoCliente = "abrindoPacote"
-
-				case "6":
+					estadoCliente = "vendocartas"
+				case "6": // Montar Deck
+					msgParaEnviar = protocolo.Envelope{Requisicao: "verCartas"}
+					estadoCliente = "preparandoDeck" // Estado intermediário
+					fmt.Println("Buscando suas cartas para iniciar a montagem do deck...")
+				case "7": //sair
 					sair = true
 					enviar = false
-
 				default:
 					estilo.Clear()
 					estilo.PrintVerm("❌Opção inválida no menu.\n")
 					exibirMenu()
 					enviar = false
 				}
+			case "montandoDeck":
+				enviar = false 
+				naipesDisponiveis := getNaipesParaValor(valorAtualParaEscolha)
+
+				escolha, err := strconv.Atoi(input)
+				if err != nil || escolha < 1 || escolha > len(naipesDisponiveis) {
+					estilo.PrintVerm("Escolha inválida, por favor digite um número da lista.\n")
+				} else {
+					naipeEscolhido := naipesDisponiveis[escolha-1]
+					deckEscolhido[valorAtualParaEscolha] = naipeEscolhido
+					estilo.PrintVerd(fmt.Sprintf("Você selecionou %s%s para a carta %s.\n", valorAtualParaEscolha, naipeEscolhido, valorAtualParaEscolha))
+				}
+				fimEscolha := proximaEscolhaDeDeck()
+				if fimEscolha{
+					estadoCliente = "menu"
+					exibirMenu()
+					fmt.Print(">> ")
+				}
+
 			case "jogando":
 				switch input {
 				case "1":
@@ -194,7 +244,7 @@ func main() {
 
 			if enviar {
 				codificador.Encode(msgParaEnviar)
-			} else {
+			} else if estadoCliente != "montandoDeck" {
 				fmt.Print(">> ")
 			}
 		}
@@ -223,7 +273,14 @@ func lerInputDoUsuario() {
 }
 
 func mostraCartas(cartas map[string]map[string]int) {
-	for valor, naipes := range cartas {
+	var valores []string
+	for valor := range cartas {
+		valores = append(valores, valor)
+	}
+	sort.Strings(valores)
+
+	for _, valor := range valores {
+		naipes := cartas[valor]
 		fmt.Printf("\n")
 		for naipe, quantidade := range naipes {
 			fmt.Printf("%s%s x%d\t\t", valor, naipe, quantidade)
@@ -240,8 +297,8 @@ func exibirMenu() {
 	fmt.Println("3-Ver PING")
 	fmt.Println("4-Ver regras do jogo")
 	fmt.Println("5-Ver suas cartas")
-	fmt.Println("6-Sair")
-
+	fmt.Println("6-Montar seu Deck de Skins") 
+	fmt.Println("7-Sair")                   
 }
 
 func exibirMenuPartida() {
@@ -268,4 +325,50 @@ func verRegras() {
 	fmt.Println("2: 2")
 	fmt.Println("A: 1")
 	fmt.Println("Em cada turno você pode escolher pegar uma carta, ou parar de pegar cartas finalizando suas jogadas")
+}
+
+
+func iniciarMontagemDeck() {
+	valoresParaEscolher = nil 
+	for valor := range inventarioCliente {
+		valoresParaEscolher = append(valoresParaEscolher, valor)
+	}
+	sort.Strings(valoresParaEscolher) 
+	estilo.Clear()
+	fmt.Println("--- MONTANDO SEU DECK ---")
+	fmt.Println("Escolha um naipe (skin) para cada valor de carta que você possui.")
+}
+
+func proximaEscolhaDeDeck() bool{
+	if len(valoresParaEscolher) > 0 {
+		valorAtualParaEscolha = valoresParaEscolher[0]
+		valoresParaEscolher = valoresParaEscolher[1:] 
+
+		naipesDisponiveis := getNaipesParaValor(valorAtualParaEscolha)
+
+		fmt.Printf("\nPara a carta de valor '%s', qual naipe você quer usar?\n", valorAtualParaEscolha)
+		for i, naipe := range naipesDisponiveis {
+			fmt.Printf("  %d: %s\n", i+1, naipe)
+		}
+		fmt.Print(">> ")
+		return false
+	} else {
+		estilo.PrintVerd("\n🎉 Deck montado com sucesso! Suas escolhas foram salvas.\n")
+		fmt.Println("Deck Atual:")
+		for valor, naipe := range deckEscolhido {
+			fmt.Printf("  %s -> %s%s\n", valor, valor, naipe)
+		}
+		return true
+	}
+}
+
+func getNaipesParaValor(valor string) []string {
+	var naipes []string
+	if naipesDoValor, ok := inventarioCliente[valor]; ok {
+		for naipe := range naipesDoValor {
+			naipes = append(naipes, naipe)
+		}
+	}
+	sort.Strings(naipes)
+	return naipes
 }
