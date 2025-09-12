@@ -348,7 +348,11 @@ func pegarCarta(partida *servUtils.Partida, cliente *servUtils.Cliente, adversar
 
 		servUtils.EnviarResJogada(codificador, carta, pontos, cliente)
 		servUtils.EnviarAviso(codificadorAdiversario, "Seu adversário pegou uma carta")
-		servUtils.EnviarAviso(codificadorAdiversario, " É o seu turno!")
+		if !adversario.ParouCartas{
+			servUtils.EnviarAviso(codificadorAdiversario, " É o seu turno!")
+		} else {
+			servUtils.EnviarAviso(codificador, " É o seu turno!")
+		}
 
 	} else {
 		servUtils.EnviarAviso(codificador, "Não há mais cartas")
@@ -389,7 +393,7 @@ func finalizarPartida(partida *servUtils.Partida, cliente *servUtils.Cliente, ad
 		cliente.Nome:            cliente.Jogador.Mao,
 		adversario.Cliente.Nome: adversario.Mao,
 	}
-	
+
 	skins := map[string]map[string]string{
 		cliente.Nome:            cliente.Skins,
 		adversario.Cliente.Nome: adversario.Cliente.Skins,
