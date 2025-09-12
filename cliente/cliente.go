@@ -25,12 +25,19 @@ var valoresParaEscolher []string
 var valorAtualParaEscolha string
 
 func main() {
-	conexao, err := net.Dial("tcp", "localhost:8080")
-	if err != nil {
-		fmt.Println("Erro ao conectar:", err)
-		return
-	}
-	defer conexao.Close()
+    serverAddress := "localhost:8080" 
+    if len(os.Args) > 1 {
+        serverAddress = os.Args[1]
+    }
+    fmt.Printf("Tentando conectar ao servidor em %s...\n", serverAddress)
+
+
+    conexao, err := net.Dial("tcp", serverAddress)
+    if err != nil {
+        fmt.Println("Erro ao conectar:", err)
+        return
+    }
+    defer conexao.Close()
 
 	codificador := json.NewEncoder(conexao)
 
