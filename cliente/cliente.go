@@ -175,10 +175,15 @@ func main() {
 				json.Unmarshal(msgServidor.Dados, &cartas)
 				inventarioCliente = cartas.Cartas 
 				if estadoCliente == "preparandoDeck" {
-					iniciarMontagemDeck()
-					estadoCliente = "montandoDeck"
-					fimEscolha := proximaEscolhaDeDeck() 
-					if fimEscolha{
+					if iniciarMontagemDeck(){
+						estadoCliente = "montandoDeck"
+						fimEscolha := proximaEscolhaDeDeck() 
+						if fimEscolha{
+							estadoCliente = "menu"
+							exibirMenu()
+							fmt.Print(">> ")
+						}
+					}else{
 						estadoCliente = "menu"
 						exibirMenu()
 						fmt.Print(">> ")
@@ -253,7 +258,8 @@ func main() {
 
 				escolha, err := strconv.Atoi(input)
 				if err != nil || escolha < 1 || escolha > len(naipesDisponiveis) {
-					estilo.PrintVerm("Escolha inválida, por favor digite um número da lista.\n")
+					msg := fmt.Sprintf("Escolha inválida, carta não selecionada para %s \npor favor digite um número da lista.\n", valorAtualParaEscolha)
+					estilo.PrintVerm(msg)
 				} else {
 					naipeEscolhido := naipesDisponiveis[escolha-1]
 					deckEscolhido[valorAtualParaEscolha] = naipeEscolhido
@@ -316,20 +322,24 @@ func lerInputDoUsuario() {
 }
 
 func mostraCartas(cartas map[string]map[string]int) {
-	var valores []string
-	for valor := range cartas {
-		valores = append(valores, valor)
-	}
-	sort.Strings(valores)
-
-	for _, valor := range valores {
-		naipes := cartas[valor]
-		fmt.Printf("\n")
-		for naipe, quantidade := range naipes {
-			fmt.Printf("%s%s x%d\t\t", valor, naipe, quantidade)
+	if len(cartas) > 0{
+		var valores []string
+		for valor := range cartas {
+			valores = append(valores, valor)
 		}
+		sort.Strings(valores)
+
+		for _, valor := range valores {
+			naipes := cartas[valor]
+			fmt.Printf("\n")
+			for naipe, quantidade := range naipes {
+				fmt.Printf("%s%s x%d\t\t", valor, naipe, quantidade)
+			}
+		}
+		fmt.Printf("\n")
+	} else {
+		estilo.PrintVerm("❌Você não tem cartas\nAbra pacotes para aumentar sua coleção\n")
 	}
-	fmt.Printf("\n")
 }
 
 func exibirMenu() {
@@ -371,15 +381,21 @@ func verRegras() {
 }
 
 
-func iniciarMontagemDeck() {
-	valoresParaEscolher = nil 
-	for valor := range inventarioCliente {
-		valoresParaEscolher = append(valoresParaEscolher, valor)
+func iniciarMontagemDeck() bool{
+	if len(inventarioCliente) > 0{
+		valoresParaEscolher = nil 
+		for valor := range inventarioCliente {
+			valoresParaEscolher = append(valoresParaEscolher, valor)
+		}
+		sort.Strings(valoresParaEscolher) 
+		estilo.Clear()
+		fmt.Println("--- MONTANDO SEU DECK ---")
+		fmt.Println("Escolha um naipe (skin) para cada valor de carta que você possui.")
+		return true
+	} else{
+		estilo.PrintVerm("❌Você não possui cartas para escolher\nAbra pacotes para montar seu deck\n")
+		return false
 	}
-	sort.Strings(valoresParaEscolher) 
-	estilo.Clear()
-	fmt.Println("--- MONTANDO SEU DECK ---")
-	fmt.Println("Escolha um naipe (skin) para cada valor de carta que você possui.")
 }
 
 func proximaEscolhaDeDeck() bool{
@@ -414,8 +430,4 @@ func getNaipesParaValor(valor string) []string {
 	}
 	sort.Strings(naipes)
 	return naipes
-}
-
-func envioDeckServidor(){
-	//
 }
