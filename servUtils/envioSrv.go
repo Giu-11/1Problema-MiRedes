@@ -14,6 +14,7 @@ type Cliente struct {
 	JogoID  string
 	Estado  string
 	Jogador *Jogador
+	Skins map[string]string 
 	Cartas  map[string]map[string]int
 	Mutex   sync.Mutex
 }
@@ -23,7 +24,6 @@ type Jogador struct {
 	Mao         []string
 	Pontos      int
 	ParouCartas bool
-	//skins map[string]*string //TODO: implemantar as esteticas de cartas
 }
 
 type Partida struct {
@@ -97,9 +97,9 @@ func EnviarSauiPartida(codificador json.Encoder, mensagem string) {
 	}
 }
 
-func EnviarFimPartida(codificador *json.Encoder, codificador2 *json.Encoder, resultado string, pontos map[string]int) {
+func EnviarFimPartida(codificador *json.Encoder, codificador2 *json.Encoder, resultado string, pontos map[string]int, maos map[string][]string, skins map[string]map[string]string) {
 	envelope := protocolo.Envelope{Requisicao: "fimPartida"}
-	fimPartida := protocolo.FimPartida{Pontos: pontos, Ganhador: resultado}
+	fimPartida := protocolo.FimPartida{Pontos: pontos, Ganhador: resultado, Skins: skins, Maos: maos}
 	dadosCod, err := json.Marshal(fimPartida)
 
 	if err == nil {

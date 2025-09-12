@@ -39,9 +39,8 @@ type RespostaJogada struct{
 type FimPartida struct{
 	Ganhador string
 	Pontos map[string]int
-	//skins map[string](map[string]string)
-	//ou
-	//maos map[string]([]string)
+	Skins map[string](map[string]string)
+	Maos map[string]([]string)
 }
 
 type CartaNova struct{
@@ -51,4 +50,8 @@ type CartaNova struct{
 
 type TodasCartas struct{
 	Cartas map[string]map[string]int
+}
+
+type NovoDeck struct{
+	Deck map[string]string
 }

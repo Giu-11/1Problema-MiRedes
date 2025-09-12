@@ -101,13 +101,18 @@ func main() {
 				var dadosPartida protocolo.FimPartida
 				json.Unmarshal(msgServidor.Dados, &dadosPartida)
 				for nome, pontos := range dadosPartida.Pontos {
-					fmt.Printf("%s conseguiu %d pontos\n", nome, pontos)
+					fmt.Printf("%s conseguiu: ", nome)
+					for _,cartas := range dadosPartida.Maos[nome]{
+						fmt.Printf(" %s%s ",cartas, dadosPartida.Skins[nome][cartas])
+					}
+					fmt.Print("\n")
+					fmt.Printf("\t%s: %d pontos\n\n", nome, pontos)
 				}
 				if dadosPartida.Ganhador != "empate" {
-					msg := fmt.Sprintf("%s GANHOU🎉!\n", dadosPartida.Ganhador)
+					msg := fmt.Sprintf("\t\t%s GANHOU🎉!\n", dadosPartida.Ganhador)
 					estilo.PrintVerd(msg)
 				} else {
-					fmt.Println("EMPATE")
+					fmt.Println("\t\tEMPATE")
 				}
 				estadoCliente = "menu"
 				exibirMenu()
@@ -221,6 +226,9 @@ func main() {
 				}
 				fimEscolha := proximaEscolhaDeDeck()
 				if fimEscolha{
+					enviar = true 
+					dados,_ := json.Marshal(protocolo.NovoDeck{Deck: deckEscolhido})
+					msgParaEnviar = protocolo.Envelope{Requisicao: "novoDeck", Dados: dados}
 					estadoCliente = "menu"
 					exibirMenu()
 					fmt.Print(">> ")
@@ -371,4 +379,8 @@ func getNaipesParaValor(valor string) []string {
 	}
 	sort.Strings(naipes)
 	return naipes
+}
+
+func envioDeckServidor(){
+	//
 }

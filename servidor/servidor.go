@@ -53,6 +53,21 @@ func lidarComConexao(conexao net.Conn) {
 	codificador := json.NewEncoder(conexao)
 
 	cliente := &servUtils.Cliente{Conexao: conexao, Nome: "", Estado: "login", JogoID: ""}
+	cliente.Skins = map[string]string{
+		"K":  "K",
+		"Q":  "Q",
+		"J":  "J",
+		"10": "10",
+		"9":  "9",
+		"8":  "8",
+		"7":  "7",
+		"6":  "6",
+		"5":  "5",
+		"4":  "4",
+		"3":  "3",
+		"2":  "2",
+		"A":  "A",
+	}
 
 	defer desconectarCliente(cliente)
 
@@ -78,7 +93,7 @@ func lidarComConexao(conexao net.Conn) {
 
 		case "procurar":
 			cliente.Mutex.Lock()
-			if cliente.Estado == "" {
+			if cliente.Estado == "menu" {
 				cliente.Estado = "esperando"
 				cliente.Mutex.Unlock()
 				addFilaEspera(cliente)
@@ -103,7 +118,7 @@ func lidarComConexao(conexao net.Conn) {
 			estado := cliente.Estado
 			cliente.Mutex.Unlock()
 
-			if estado == "" {
+			if estado == "menu" {
 				valor, naipe := cartasUtils.AbrirPacote()
 				if valor != "" && naipe != "" {
 					addCartaCliente(valor, naipe, cliente)
@@ -118,6 +133,13 @@ func lidarComConexao(conexao net.Conn) {
 			cartas := cliente.Cartas
 			cliente.Mutex.Unlock()
 			servUtils.EnviarCartas(codificador, cartas)
+
+		case "novoDeck":
+			var novoDeck protocolo.NovoDeck
+			if err := json.Unmarshal(envelope.Dados, &novoDeck); err == nil {
+				mudarSkins(cliente, novoDeck.Deck)
+			}
+
 		}
 	}
 }
@@ -131,7 +153,7 @@ func login(cliente *servUtils.Cliente, envelope *protocolo.Envelope, codificador
 		if err := json.Unmarshal(envelope.Dados, &dadosLogin); err == nil {
 			if tentarLogin(dadosLogin) {
 				cliente.Nome = dadosLogin.Nome
-				cliente.Estado = ""
+				cliente.Estado = "menu"
 				addListaClientes(cliente)
 				servUtils.EnviarResposta(*codificador, "confirmacao", "login", true)
 			} else {
@@ -263,7 +285,7 @@ func desconectarCliente(cliente *servUtils.Cliente) {
 			servUtils.EnviarSauiPartida(*codificadorAdversario, mensagem)
 			oponente.Jogador = nil
 			oponente.JogoID = ""
-			oponente.Estado = ""
+			oponente.Estado = "menu"
 			oponente.Mutex.Unlock()
 		}
 	}
@@ -363,8 +385,17 @@ func finalizarPartida(partida *servUtils.Partida, cliente *servUtils.Cliente, ad
 	} else if dis21cliente > dis21adversario {
 		vencedor = adversario.Cliente.Nome
 	}
+	maos := map[string][]string{
+		cliente.Nome:            cliente.Jogador.Mao,
+		adversario.Cliente.Nome: adversario.Mao,
+	}
+	
+	skins := map[string]map[string]string{
+		cliente.Nome:            cliente.Skins,
+		adversario.Cliente.Nome: adversario.Cliente.Skins,
+	}
 
-	servUtils.EnviarFimPartida(codificador, codificadorAdiversario, vencedor, pontosFinais)
+	servUtils.EnviarFimPartida(codificador, codificadorAdiversario, vencedor, pontosFinais, maos, skins)
 	fecharPartida(partida)
 }
 
@@ -373,9 +404,10 @@ func fecharPartida(partida *servUtils.Partida) {
 		jogador.Cliente.Mutex.Lock()
 		jogador.Cliente.Jogador = nil
 		jogador.Cliente.JogoID = ""
-		jogador.Cliente.Estado = ""
+		jogador.Cliente.Estado = "menu"
 		jogador.Cliente.Mutex.Unlock()
 	}
+	estilo.PrintMag("FIM DE PARTIDA\n")
 }
 
 func addCartaCliente(valor string, naipe string, cliente *servUtils.Cliente) {
@@ -391,4 +423,12 @@ func addCartaCliente(valor string, naipe string, cliente *servUtils.Cliente) {
 	}
 
 	cliente.Cartas[valor][naipe]++
+}
+
+func mudarSkins(cliente *servUtils.Cliente, skins map[string]string) {
+	cliente.Mutex.Lock()
+	defer cliente.Mutex.Unlock()
+	for carta := range cliente.Skins {
+		cliente.Skins[carta] = skins[carta]
+	}
 }
