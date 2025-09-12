@@ -1,0 +1,11 @@
+.git
+dockerfile
+*.md
+*.log
+bin/
+*.exe
+*.out
+tmp/
+.vscode/
+*.swp
+*.tmp
