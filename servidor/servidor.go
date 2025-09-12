@@ -113,6 +113,15 @@ func lidarComConexao(conexao net.Conn) {
 				}
 			}
 
+		case "ping":
+			if cliente.Estado == "menu" {
+				resposta := protocolo.Envelope{Requisicao: "ping"}
+				err := codificador.Encode(resposta)
+				if err != nil {
+					fmt.Println("Erro no envio de dados")
+				}
+			}
+
 		case "abrirPacote":
 			cliente.Mutex.Lock()
 			estado := cliente.Estado
@@ -139,7 +148,6 @@ func lidarComConexao(conexao net.Conn) {
 			if err := json.Unmarshal(envelope.Dados, &novoDeck); err == nil {
 				mudarSkins(cliente, novoDeck.Deck)
 			}
-
 		}
 	}
 }
