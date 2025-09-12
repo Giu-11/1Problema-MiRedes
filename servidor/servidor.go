@@ -23,6 +23,7 @@ var partidasMutex = &sync.Mutex{}
 var esperaMutex = &sync.Mutex{}
 
 func main() {
+	//inicia o servidor criando o estoque e esperando conexões
 	estilo.Clear()
 	cartasUtils.CriadorEstoque()
 	fmt.Println("Estoque de cartas gerado")
@@ -36,6 +37,7 @@ func main() {
 	defer ouvinte.Close()
 
 	for {
+		//inicia uma nova goroutine para os novos clientes conectados
 		conexao, err := ouvinte.Accept()
 		if err != nil {
 			msg := fmt.Sprintf("Erro ao aceitar conexão:%s\n", err)
@@ -52,7 +54,8 @@ func lidarComConexao(conexao net.Conn) {
 	decodificador := json.NewDecoder(conexao)
 	codificador := json.NewEncoder(conexao)
 
-	cliente := &servUtils.Cliente{Conexao: conexao, Nome: "", Estado: "login", JogoID: ""}
+	//inicia um objeto cliente com skins e dados padão
+	cliente := &servUtils.Cliente{Conexao: conexao, Nome: "não logado", Estado: "login", JogoID: ""}
 	cliente.Skins = map[string]string{
 		"K":  "K",
 		"Q":  "Q",
@@ -73,6 +76,7 @@ func lidarComConexao(conexao net.Conn) {
 
 	sair := false
 	for !sair {
+		//le as mensagens do cliente
 		var envelope protocolo.Envelope
 		err := decodificador.Decode(&envelope)
 		if err != nil {
@@ -87,6 +91,7 @@ func lidarComConexao(conexao net.Conn) {
 			continue
 		}
 
+		//interpreta o pedido do cliente
 		switch envelope.Requisicao {
 		case "login":
 			login(cliente, &envelope, codificador)
@@ -133,17 +138,19 @@ func lidarComConexao(conexao net.Conn) {
 					addCartaCliente(valor, naipe, cliente)
 					servUtils.EnviarNovaCarta(codificador, valor, naipe)
 				} else {
-					servUtils.EnviarResposta(*codificador, "confirmacao", "pacote", false)
+					servUtils.EnviarConfirmacao(*codificador, "confirmacao", "pacote", false)
 				}
 			}
 
 		case "verCartas":
+			//envia as cartas do estoque do cliente
 			cliente.Mutex.Lock()
 			cartas := cliente.Cartas
 			cliente.Mutex.Unlock()
 			servUtils.EnviarCartas(codificador, cartas)
 
 		case "novoDeck":
+			//atualiza o deck do cliente
 			var novoDeck protocolo.NovoDeck
 			if err := json.Unmarshal(envelope.Dados, &novoDeck); err == nil {
 				mudarSkins(cliente, novoDeck.Deck)
@@ -152,6 +159,7 @@ func lidarComConexao(conexao net.Conn) {
 	}
 }
 
+// lida com dados de recebimeto e envio de resultado do login
 func login(cliente *servUtils.Cliente, envelope *protocolo.Envelope, codificador *json.Encoder) {
 	cliente.Mutex.Lock()
 	defer cliente.Mutex.Unlock()
@@ -163,9 +171,9 @@ func login(cliente *servUtils.Cliente, envelope *protocolo.Envelope, codificador
 				cliente.Nome = dadosLogin.Nome
 				cliente.Estado = "menu"
 				addListaClientes(cliente)
-				servUtils.EnviarResposta(*codificador, "confirmacao", "login", true)
+				servUtils.EnviarConfirmacao(*codificador, "confirmacao", "login", true)
 			} else {
-				servUtils.EnviarResposta(*codificador, "confirmacao", "login", false)
+				servUtils.EnviarConfirmacao(*codificador, "confirmacao", "login", false)
 			}
 		}
 	} else {
@@ -173,6 +181,7 @@ func login(cliente *servUtils.Cliente, envelope *protocolo.Envelope, codificador
 	}
 }
 
+// verifica se o nome é válido e se ele não existe na lista de clientes
 func tentarLogin(dadosLogin protocolo.Login) bool {
 	if dadosLogin.Nome != "" {
 		clientesMutex.Lock()
@@ -183,12 +192,14 @@ func tentarLogin(dadosLogin protocolo.Login) bool {
 	return false
 }
 
+// adiciona um cliente a lista de clientes conecatados
 func addListaClientes(cliente *servUtils.Cliente) {
 	clientesMutex.Lock()
 	defer clientesMutex.Unlock()
 	clientes[cliente.Nome] = cliente
 }
 
+// adiciona um cliente a lista de espera por partida
 func addFilaEspera(cliente *servUtils.Cliente) {
 	esperaMutex.Lock()
 	filaEspera = append(filaEspera, cliente)
@@ -200,6 +211,7 @@ func addFilaEspera(cliente *servUtils.Cliente) {
 	verificarEspera()
 }
 
+// verifica se há clientes na fila de espera para criar uma paratida, se tiver, cria e avisa os clientes
 func verificarEspera() {
 	esperaMutex.Lock()
 	if len(filaEspera) < 2 {
@@ -253,6 +265,7 @@ func verificarEspera() {
 	servUtils.EnviarInicioPartida(*codificador2, cliente1.Nome, partida.Turno)
 }
 
+// desconecta o cliente, removendo da lista de conexões e de possiveis partidas e fila de espera onde ele pode estar
 func desconectarCliente(cliente *servUtils.Cliente) {
 	cliente.Mutex.Lock()
 	nomeCliente := cliente.Nome
@@ -310,6 +323,7 @@ func desconectarCliente(cliente *servUtils.Cliente) {
 	estilo.PrintVerm(msg)
 }
 
+// interpreta e realiza a jogada do cliente, atualizando turno e avisando da jogada a todos
 func lidarComJogada(cliente *servUtils.Cliente, jogada protocolo.Jogada, codificador json.Encoder) {
 	partidasMutex.Lock()
 	partida, ok := partidas[cliente.JogoID]
@@ -339,6 +353,7 @@ func lidarComJogada(cliente *servUtils.Cliente, jogada protocolo.Jogada, codific
 	}
 }
 
+// realiza a jogada de pegar uma carta do baralho
 func pegarCarta(partida *servUtils.Partida, cliente *servUtils.Cliente, adversario *servUtils.Jogador, codificador json.Encoder, codificadorAdiversario json.Encoder) {
 	partidasMutex.Lock()
 	defer partidasMutex.Unlock()
@@ -356,7 +371,7 @@ func pegarCarta(partida *servUtils.Partida, cliente *servUtils.Cliente, adversar
 
 		servUtils.EnviarResJogada(codificador, carta, pontos, cliente)
 		servUtils.EnviarAviso(codificadorAdiversario, "Seu adversário pegou uma carta")
-		if !adversario.ParouCartas{
+		if !adversario.ParouCartas {
 			servUtils.EnviarAviso(codificadorAdiversario, " É o seu turno!")
 		} else {
 			servUtils.EnviarAviso(codificador, " É o seu turno!")
@@ -368,6 +383,7 @@ func pegarCarta(partida *servUtils.Partida, cliente *servUtils.Cliente, adversar
 	}
 }
 
+// atualiza dados do cliente caso ele escolha não pegar mais cartas
 func pararCartas(cliente *servUtils.Cliente, adversario *servUtils.Jogador, partida *servUtils.Partida, codificador *json.Encoder, codificadorAdiversario *json.Encoder) {
 	partidasMutex.Lock()
 	defer partidasMutex.Unlock()
@@ -384,6 +400,7 @@ func pararCartas(cliente *servUtils.Cliente, adversario *servUtils.Jogador, part
 	}
 }
 
+// finaliza a partida, decidindo um ganhador e informando os do resultado
 func finalizarPartida(partida *servUtils.Partida, cliente *servUtils.Cliente, adversario *servUtils.Jogador, codificador *json.Encoder, codificadorAdiversario *json.Encoder) {
 	pontosFinais := map[string]int{
 		cliente.Nome:            cliente.Jogador.Pontos,
@@ -411,6 +428,7 @@ func finalizarPartida(partida *servUtils.Partida, cliente *servUtils.Cliente, ad
 	fecharPartida(partida)
 }
 
+// tira a partida do
 func fecharPartida(partida *servUtils.Partida) {
 	for _, jogador := range partida.Jogadores {
 		jogador.Cliente.Mutex.Lock()
@@ -419,9 +437,12 @@ func fecharPartida(partida *servUtils.Partida) {
 		jogador.Cliente.Estado = "menu"
 		jogador.Cliente.Mutex.Unlock()
 	}
+	partidasMutex.Lock()
+	delete(partidas, partida.ID)
 	estilo.PrintMag("FIM DE PARTIDA\n")
 }
 
+// adiciona uma nova carta ao estoque do cliente
 func addCartaCliente(valor string, naipe string, cliente *servUtils.Cliente) {
 	cliente.Mutex.Lock()
 	defer cliente.Mutex.Unlock()
@@ -437,6 +458,7 @@ func addCartaCliente(valor string, naipe string, cliente *servUtils.Cliente) {
 	cliente.Cartas[valor][naipe]++
 }
 
+// atualiza o deck de skins do cliente
 func mudarSkins(cliente *servUtils.Cliente, skins map[string]string) {
 	cliente.Mutex.Lock()
 	defer cliente.Mutex.Unlock()

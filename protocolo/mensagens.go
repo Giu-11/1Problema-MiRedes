@@ -2,56 +2,67 @@ package protocolo
 
 import "encoding/json"
 
+//envelope geral contendo motivo da mensagem e dados adicionais
 type Envelope struct {
 	Requisicao string
 	Dados      json.RawMessage
 }
 
-type Login struct{
+//dados do login
+type Login struct {
 	Nome string
-	Senha string
+	//Senha string
 }
 
-type InicioPartida struct{
-	Oponente string
+//dados iniciais da partida
+type InicioPartida struct {
+	Oponente      string
 	PrimeiroJogar string
 }
 
-type Confirmacao struct{
-	Assunto string
+//manda uma confirmação de uma ação teve sucesso
+type Confirmacao struct {
+	Assunto   string
 	Resultado bool
 }
 
-type Mensagem struct{ 
+//manda uma mensagem de texto simples
+type Mensagem struct {
 	Mensagem string
 }
 
-type Jogada struct{
+//manda a jogada do jogador
+type Jogada struct {
 	Acao string
 }
 
-type RespostaJogada struct{
-	Carta string
+//resultados da jogada
+type RespostaJogada struct {
+	Carta       string
 	PontosCarta int
 	PontosTotal int
 }
 
-type FimPartida struct{
+//informações do final da partida
+type FimPartida struct {
 	Ganhador string
-	Pontos map[string]int
-	Skins map[string](map[string]string)
-	Maos map[string]([]string)
+	Pontos   map[string]int
+	Skins    map[string](map[string]string)
+	Maos     map[string]([]string)
 }
 
-type CartaNova struct{
+//dados da nova carta do cliente
+type CartaNova struct {
 	Valor string
 	Naipe string
 }
 
-type TodasCartas struct{
+//manda o estoque de cartas do cliente
+type TodasCartas struct {
 	Cartas map[string]map[string]int
 }
 
-type NovoDeck struct{
+//manda o deck escolhido pelo cliente
+type NovoDeck struct {
 	Deck map[string]string
 }

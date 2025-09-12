@@ -5,16 +5,12 @@ import (
 	"sync"
 )
 
-type Carta struct {
-	Naipe      string
-	Tipo       string
-	Quantidade int
-}
-
+// variaveis do estoque central de cartas
 var totalCartas int
 var estoqueCartas = make(map[string]map[string]int)
 var cartasMutex = &sync.Mutex{}
 
+// guada a pontuação de cada carta
 var pontuacoes = map[string]int{
 	"K":  10,
 	"Q":  10,
@@ -30,10 +26,12 @@ var pontuacoes = map[string]int{
 	"2":  2,
 	"A":  1}
 
+// mostra quantos pontos cada carta vale
 func TradutorPontos(carta string) int {
 	return pontuacoes[carta]
 }
 
+// prepara um baralho embaralhado para uma partida
 func GeradorCartasEmbaralhadas() []string {
 	cartas := []string{"A", "K", "Q", "J", "10", "9", "8", "7", "6", "5", "4", "3", "2"}
 
@@ -44,12 +42,15 @@ func GeradorCartasEmbaralhadas() []string {
 	return cartas
 }
 
+// inicia o estoque com uma quantidade fixa de cartas de cada valor e naipe
 func CriadorEstoque() {
 	cartasMutex.Lock()
 	defer cartasMutex.Unlock()
 
 	estoqueCartas = make(map[string]map[string]int)
 	valores := []string{"A", "K", "Q", "J", "10", "9", "8", "7", "6", "5", "4", "3", "2"}
+	//quantidade de cartas criada para cada naipe
+	//raridade é baseada na propria quantidade de cartas
 	quantidadesPorNaipe := map[string]int{
 		"♥️": 10,
 		"♠️": 20,
@@ -66,6 +67,7 @@ func CriadorEstoque() {
 	}
 }
 
+// sorteia uma carta para o cliente, retorna "" caso não hajam mais"
 func AbrirPacote() (string, string) {
 	cartasMutex.Lock()
 	defer cartasMutex.Unlock()
@@ -79,11 +81,11 @@ func AbrirPacote() (string, string) {
 	acumulado := 0
 	for valor, naipes := range estoqueCartas {
 		for naipe, qtd := range naipes {
-			if qtd > 0 { 
+			if qtd > 0 {
 				acumulado += qtd
 				if r < acumulado {
-					estoqueCartas[valor][naipe]-- 
-					totalCartas--     
+					estoqueCartas[valor][naipe]--
+					totalCartas--
 					return valor, naipe
 				}
 			}

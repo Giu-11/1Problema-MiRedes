@@ -8,31 +8,35 @@ import (
 	"sync"
 )
 
+// cliente dentro do servidor
 type Cliente struct {
-	Conexao net.Conn
+	Conexao net.Conn //conexão do cliente
 	Nome    string
 	JogoID  string
 	Estado  string
-	Jogador *Jogador
-	Skins map[string]string 
-	Cartas  map[string]map[string]int
-	Mutex   sync.Mutex
+	Jogador *Jogador                  //objeto jogador quando o cliente estiver dentro de uma partida
+	Skins   map[string]string         //deck de skins
+	Cartas  map[string]map[string]int //estoque de cartas do cliente
+	Mutex   sync.Mutex                //mutex para mudanças do cliente
 }
 
+// cliente dentro de uma partida
 type Jogador struct {
-	Cliente     *Cliente
-	Mao         []string
+	Cliente     *Cliente // cliente que esse jogador se refere
+	Mao         []string //cartas que ele pegou do baralho
 	Pontos      int
-	ParouCartas bool
+	ParouCartas bool //se ele já parou de pegar cartas
 }
 
+// partida entre dosi clientes
 type Partida struct {
-	ID        string
-	Jogadores map[string]*Jogador
-	Turno     string
-	Cartas    []string
+	ID        string              //identificação dela
+	Jogadores map[string]*Jogador //referencia aos jogadores da partida
+	Turno     string              //quem deve jogar
+	Cartas    []string            //baralho de cartas
 }
 
+// envia uma resposta a jogada
 func EnviarResJogada(codificador json.Encoder, carta string, pontos int, cliente *Cliente) {
 	resposta := protocolo.Envelope{Requisicao: "resJogada"}
 	respostaJogada := protocolo.RespostaJogada{Carta: carta, PontosCarta: pontos, PontosTotal: cliente.Jogador.Pontos}
@@ -49,7 +53,8 @@ func EnviarResJogada(codificador json.Encoder, carta string, pontos int, cliente
 	}
 }
 
-func EnviarResposta(codificador json.Encoder, requisicao string, assunto string, resultado bool) {
+// envia uma confirmação a uma ação do cliente,
+func EnviarConfirmacao(codificador json.Encoder, requisicao string, assunto string, resultado bool) {
 	resposta := protocolo.Envelope{Requisicao: requisicao}
 	respostaLogin := protocolo.Confirmacao{Assunto: assunto, Resultado: resultado}
 
@@ -65,6 +70,7 @@ func EnviarResposta(codificador json.Encoder, requisicao string, assunto string,
 	}
 }
 
+// envia um aviso
 func EnviarAviso(codificador json.Encoder, aviso string) {
 	resposta := protocolo.Envelope{Requisicao: "notfServidor"}
 	respostaLogin := protocolo.Mensagem{Mensagem: aviso}
@@ -81,6 +87,7 @@ func EnviarAviso(codificador json.Encoder, aviso string) {
 	}
 }
 
+// envia aviso que adiversario saiu da partida
 func EnviarSauiPartida(codificador json.Encoder, mensagem string) {
 	envelope := protocolo.Envelope{Requisicao: "saiuPartida"}
 	respostaLogin := protocolo.Mensagem{Mensagem: mensagem}
@@ -97,6 +104,7 @@ func EnviarSauiPartida(codificador json.Encoder, mensagem string) {
 	}
 }
 
+// envia dados sobre o fim da partida
 func EnviarFimPartida(codificador *json.Encoder, codificador2 *json.Encoder, resultado string, pontos map[string]int, maos map[string][]string, skins map[string]map[string]string) {
 	envelope := protocolo.Envelope{Requisicao: "fimPartida"}
 	fimPartida := protocolo.FimPartida{Pontos: pontos, Ganhador: resultado, Skins: skins, Maos: maos}
@@ -117,6 +125,7 @@ func EnviarFimPartida(codificador *json.Encoder, codificador2 *json.Encoder, res
 	}
 }
 
+// envia dados sobre o inicio de uma nova partida
 func EnviarInicioPartida(codificador json.Encoder, oponente string, primeiroJogar string) {
 	resposta := protocolo.Envelope{Requisicao: "inicioPartida"}
 	respostaLogin := protocolo.InicioPartida{Oponente: oponente, PrimeiroJogar: primeiroJogar}
@@ -133,6 +142,7 @@ func EnviarInicioPartida(codificador json.Encoder, oponente string, primeiroJoga
 	}
 }
 
+// envia dados da carta q	ue o cliente obteve
 func EnviarNovaCarta(codificador *json.Encoder, valor string, naipe string) {
 	resposta := protocolo.Envelope{Requisicao: "novaCarta"}
 	dadosCarta := protocolo.CartaNova{Valor: valor, Naipe: naipe}
@@ -149,6 +159,7 @@ func EnviarNovaCarta(codificador *json.Encoder, valor string, naipe string) {
 	}
 }
 
+// envia estoque de cartas do cliente
 func EnviarCartas(codificador *json.Encoder, cartas map[string]map[string]int) {
 	resposta := protocolo.Envelope{Requisicao: "todasCartas"}
 	dadosCarta := protocolo.TodasCartas{Cartas: cartas}
