@@ -83,7 +83,10 @@ func main() {
 					}
 				case "pacote": //caso o servidor mande um aviso de fim de cartas no estoque
 					if !conf.Resultado {
+						estilo.Clear()
 						estilo.PrintVerm("Não há mais pacotes!❌")
+						exibirMenu()
+						estadoCliente = "menu"
 					}
 				}
 
