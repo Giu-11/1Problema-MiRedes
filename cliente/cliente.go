@@ -14,19 +14,24 @@ import (
 	"time"
 )
 
+//canais para conexão entre main input do usuario e servidor
 var mensagensDoServidor = make(chan protocolo.Envelope)
 var inputDoUsuario = make(chan string)
 
+//cartas do cliente, para que não precise pedir sempre ao servidor
 var inventarioCliente map[string]map[string]int
 
+//deck de cartas do cliente
 var deckEscolhido = make(map[string]string)
 
+//variaveis para auxilio na montagem do deck
 var valoresParaEscolher []string
 var valorAtualParaEscolha string
 
 func main() {
     serverAddress := "localhost:8080" 
-    if len(os.Args) > 1 {
+    //se conecta a um endereço IP especifico caso o argumento seja passado
+	if len(os.Args) > 1 {
         serverAddress = os.Args[1]
     }
     fmt.Printf("Tentando conectar ao servidor em %s...\n", serverAddress)
@@ -44,6 +49,8 @@ func main() {
 	go receberMensagens(conexao)
 	go lerInputDoUsuario()
 
+	var nomeTemp string
+	var nomeUsuario string
 	estadoCliente := "login"
 	estilo.Clear()
 	fmt.Println("\n--- Bem-vindo! ---")
@@ -55,15 +62,18 @@ func main() {
 	sair := false
 	for !sair {
 		select {
+			//ouve as conexões para tratar com informações vindads delas
 		case msgServidor := <-mensagensDoServidor:
 			switch msgServidor.Requisicao {
+				//trata mensagens do servidor
 			case "confirmacao":
 				var conf protocolo.Confirmacao
 				json.Unmarshal(msgServidor.Dados, &conf)
 				switch conf.Assunto {
-				case "login":
+				case "login": //caso o servidor mande uma resposta sobre a tentativa de login
 					if conf.Resultado {
 						estilo.Clear()
+						nomeUsuario = nomeTemp
 						estilo.PrintVerd("\n✅ Login realizado com sucesso!\n")
 						estadoCliente = "menu"
 						exibirMenu()
@@ -71,7 +81,7 @@ func main() {
 						estilo.PrintVerm("\n⚠️ Falha no login. Tente outro nome.\n")
 						estadoCliente = "login"
 					}
-				case "pacote":
+				case "pacote": //caso o servidor mande um aviso de fim de cartas no estoque
 					if !conf.Resultado {
 						estilo.PrintVerm("Não há mais pacotes!❌")
 					}
@@ -82,7 +92,13 @@ func main() {
 				var dadosPartida protocolo.InicioPartida
 				json.Unmarshal(msgServidor.Dados, &dadosPartida)
 				fmt.Printf("\n🃏--- PARTIDA INICIADA ---🃏\n")
-				fmt.Printf("Contra: %s | Primeiro a jogar: %s\n", dadosPartida.Oponente, dadosPartida.PrimeiroJogar)
+				var primeiro string
+				if nomeUsuario == dadosPartida.PrimeiroJogar{
+					primeiro = "VOCÊ"
+				} else{
+					primeiro = dadosPartida.PrimeiroJogar
+				}
+				fmt.Printf("Contra: %s | Primeiro a jogar: %s\n", dadosPartida.Oponente, primeiro)
 				fmt.Println("------------------------")
 				estadoCliente = "jogando"
 				exibirMenuPartida()
@@ -110,13 +126,24 @@ func main() {
 				for nome, pontos := range dadosPartida.Pontos {
 					fmt.Printf("%s conseguiu: ", nome)
 					for _,cartas := range dadosPartida.Maos[nome]{
-						fmt.Printf(" %s%s ",cartas, dadosPartida.Skins[nome][cartas])
+						if cartas != dadosPartida.Skins[nome][cartas]{
+							fmt.Printf(" %s%s ",cartas, dadosPartida.Skins[nome][cartas])
+						}else{
+							fmt.Printf(" %s ",cartas)
+						}
+						
 					}
 					fmt.Print("\n")
 					fmt.Printf("\t%s: %d pontos\n\n", nome, pontos)
 				}
 				if dadosPartida.Ganhador != "empate" {
-					msg := fmt.Sprintf("\t\t%s GANHOU🎉!\n", dadosPartida.Ganhador)
+					var ganhador string
+					if nomeUsuario == dadosPartida.Ganhador{
+						ganhador = "VOCÊ"
+					}else{
+						ganhador = dadosPartida.Ganhador
+					}
+					msg := fmt.Sprintf("\t\t%s GANHOU🎉!\n", ganhador)
 					estilo.PrintVerd(msg)
 				} else {
 					fmt.Println("\t\tEMPATE")
@@ -183,7 +210,8 @@ func main() {
 
 			switch estadoCliente {
 			case "login":
-				dados, _ := json.Marshal(protocolo.Login{Nome: input})
+				nomeTemp = strings.ToUpper(input)
+				dados, _ := json.Marshal(protocolo.Login{Nome: nomeTemp})
 				msgParaEnviar = protocolo.Envelope{Requisicao: "login", Dados: dados}
 			case "menu":
 				switch input {
