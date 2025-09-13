@@ -30,18 +30,25 @@ var valorAtualParaEscolha string
 
 func main() {
 	serverAddress := "localhost:8080"
-	//se conecta a um endereço IP especifico caso o argumento seja passado
-	if len(os.Args) > 1 {
-		serverAddress = os.Args[1]
-	}
-	fmt.Printf("Tentando conectar ao servidor em %s...\n", serverAddress)
 
-	conexao, err := net.Dial("tcp", serverAddress)
-	if err != nil {
-		fmt.Println("Erro ao conectar:", err)
-		return
-	}
-	defer conexao.Close()
+    // percorre os argumentos
+    for _, arg := range os.Args[1:] {
+        if arg == "-docker" {
+            serverAddress = "servidor:8080" // nome do container na rede Docker
+        } else {
+            // qualquer outro argumento assume como endereço
+            serverAddress = arg
+        }
+    }
+
+    fmt.Printf("Tentando conectar ao servidor em %s...\n", serverAddress)
+
+    conexao, err := net.Dial("tcp", serverAddress)
+    if err != nil {
+        fmt.Println("Erro ao conectar:", err)
+        return
+    }
+    defer conexao.Close()
 
 	codificador := json.NewEncoder(conexao)
 

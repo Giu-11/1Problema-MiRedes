@@ -385,8 +385,6 @@ func pegarCarta(partida *servUtils.Partida, cliente *servUtils.Cliente, adversar
 
 // atualiza dados do cliente caso ele escolha não pegar mais cartas
 func pararCartas(cliente *servUtils.Cliente, adversario *servUtils.Jogador, partida *servUtils.Partida, codificador *json.Encoder, codificadorAdiversario *json.Encoder) {
-	partidasMutex.Lock()
-	defer partidasMutex.Unlock()
 
 	cliente.Jogador.ParouCartas = true
 
@@ -440,6 +438,7 @@ func fecharPartida(partida *servUtils.Partida) {
 	partidasMutex.Lock()
 	delete(partidas, partida.ID)
 	estilo.PrintMag("FIM DE PARTIDA\n")
+	partidasMutex.Unlock()
 }
 
 // adiciona uma nova carta ao estoque do cliente

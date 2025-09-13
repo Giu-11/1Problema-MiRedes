@@ -1,0 +1,24 @@
+version: "3.9"
+services:
+  servidor:
+    build:
+      context: .
+      dockerfile: Dockerfile   
+    ports:
+      - "8080:8080"
+    networks:
+      - minha-rede
+
+  cliente:
+    build:
+      context: .
+      dockerfile: cliente/Dockerfile  
+    stdin_open: true  
+    tty: true  
+    networks:
+      - minha-rede
+    depends_on:
+      - servidor
+
+networks:
+  minha-rede:
