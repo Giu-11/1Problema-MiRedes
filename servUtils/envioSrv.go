@@ -28,7 +28,7 @@ type Jogador struct {
 	ParouCartas bool //se ele já parou de pegar cartas
 }
 
-// partida entre dosi clientes
+// partida entre dois clientes
 type Partida struct {
 	ID        string              //identificação dela
 	Jogadores map[string]*Jogador //referencia aos jogadores da partida
